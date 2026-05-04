@@ -4,7 +4,7 @@ Timetable and Venue management system that will manage Venue utilization and ava
 
 TVMS is a Frappe Desk/pages app. Its user interface is delivered through DocType forms, list views, and Frappe pages; there is no separate single-page app or custom client build pipeline.
 
-Main Desk routes include `/app/timetable` for imported timetable records, `/app/tvms-timetable` for the static weekly timetable grid, `/app/venue` for venue management, and `/app/emergency-session` for emergency scheduling.
+Main Desk routes include `/app/timetable` for imported timetable records, `/app/tvms-timetable` for the static weekly timetable grid, `/app/venue-grid` for venue availability cards, `/app/venue` for venue management, and `/app/emergency-session` for emergency scheduling.
 
 ### Installation
 

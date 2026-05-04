@@ -99,6 +99,15 @@ def sync_timetable_venue_statuses():
 
 	should_be_in_use = set(tt_active) | set(ems_active)
 
+	ems_booked = frappe.db.sql_list("""
+		SELECT DISTINCT venue
+		FROM `tabEmergency session`
+		WHERE status IN ('PENDING', 'CONFIRMED')
+		  AND end_time > %(now)s
+		  AND venue IS NOT NULL
+	""", {"now": now})
+	should_be_booked = set(ems_booked) - should_be_in_use
+
 	# ── Step 2: mark occupied venues IN-USE ─────────────────────────
 	if should_be_in_use:
 		frappe.db.set_value(
@@ -108,17 +117,26 @@ def sync_timetable_venue_statuses():
 			"IN-USE",
 		)
 
-	# ── Step 3: mark vacated venues FREE ────────────────────────────
-	# Any venue stored as IN-USE with no active session → FREE.
+	# ── Step 3: mark reserved emergency venues BOOKED ───────────────
+	if should_be_booked:
+		frappe.db.set_value(
+			"Venue",
+			{"name": ["in", list(should_be_booked)], "current_status": ["!=", "BOOKED"]},
+			"current_status",
+			"BOOKED",
+		)
+
+	# ── Step 4: mark vacated venues FREE ────────────────────────────
+	# Any venue stored as IN-USE/BOOKED with no active or reserved session → FREE.
 	currently_in_use = set(frappe.db.sql_list(
-		"SELECT name FROM `tabVenue` WHERE current_status = 'IN-USE'"
+		"SELECT name FROM `tabVenue` WHERE current_status IN ('IN-USE', 'BOOKED')"
 	))
-	should_be_free = currently_in_use - should_be_in_use
+	should_be_free = currently_in_use - should_be_in_use - should_be_booked
 
 	if should_be_free:
 		frappe.db.set_value(
 			"Venue",
-			{"name": ["in", list(should_be_free)], "current_status": "IN-USE"},
+			{"name": ["in", list(should_be_free)], "current_status": ["in", ["IN-USE", "BOOKED"]]},
 			"current_status",
 			"FREE",
 		)

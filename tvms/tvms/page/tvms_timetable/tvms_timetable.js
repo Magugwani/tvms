@@ -207,6 +207,7 @@ class TVMSStaticTimetable {
 				display: inline-block;
 				background: var(--green-500);
 			}
+			.tvms-status-dot.booked { background: var(--orange-500); }
 			.tvms-status-dot.in-use { background: var(--red-500); }
 			.tvms-empty {
 				padding: 36px;
@@ -339,7 +340,7 @@ class TVMSStaticTimetable {
 	}
 
 	card(session) {
-		const status_class = session.venue_status === "IN-USE" ? "in-use" : "";
+		const status_class = session.venue_status === "IN-USE" ? "in-use" : session.venue_status === "BOOKED" ? "booked" : "";
 		return `
 			<div class="tvms-session-card" data-name="${frappe.utils.escape_html(session.name)}">
 				<div class="tvms-session-title">${frappe.utils.escape_html(session.course_name || session.course || __("Untitled Course"))}</div>

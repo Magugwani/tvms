@@ -12,13 +12,19 @@ frappe.listview_settings['Venue'] = {
 		if (doc.current_status === 'IN-USE') {
 			return ["IN USE", "red", `current_status,=,IN-USE`];
 		}
+		if (doc.current_status === 'BOOKED') {
+			return ["Booked", "orange", `current_status,=,BOOKED`];
+		}
 		return ["Free", "green", `current_status,=,FREE`];
 	},
 	formatters: {
 		current_status(val, df, doc) {
-			const badge = val === 'IN-USE'
-				? `<span class="badge badge-danger">${val}</span>`
-				: `<span class="badge badge-success">${val || 'FREE'}</span>`;
+			const classes = {
+				'IN-USE': 'badge-danger',
+				'BOOKED': 'badge-warning',
+				'FREE': 'badge-success',
+			};
+			const badge = `<span class="badge ${classes[val] || 'badge-secondary'}">${val || 'FREE'}</span>`;
 			return badge;
 		}
 	}

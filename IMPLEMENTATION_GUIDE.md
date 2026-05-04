@@ -44,15 +44,22 @@ All components are now implemented using **Frappe Framework** — a unified full
 #### 2. **Venue Management**
 - **Form** (`venue.json`)
   - Venue code, name, location, capacity, resources
-  - Real-time current_status (FREE / IN-USE)
+  - Real-time current_status (FREE / BOOKED / IN-USE)
+  - Emergency session creation immediately reserves the venue as BOOKED
 
 - **List View** (`venue_list.js`)
-  - Status indicator with color dots (green=FREE, red=IN-USE)
+  - Status indicator with color dots (green=FREE, amber=BOOKED, red=IN-USE)
   - Search, sort, filter by location/capacity
+
+- **Venue Grid Page** (`/app/venue-grid`)
+  - Card grid visible to Students, CRs, Lecturers, and admins
+  - Shows venue status, capacity, resources, and current/upcoming booking windows
+  - Includes emergency session reservations and general timetable references
 
 - **Backend APIs** (`venue.py`)
   - `get_all_venues()` — list all venues with live status
   - `get_all_venue_statuses()` — status snapshot
+  - `get_venue_grid()` — venue card data with status and booking windows
   - `get_available_venues()` — find available venues for time slot
   - `recommend_venue()` — suggest best-fit venue
 
@@ -241,7 +248,8 @@ apps/tvms/tvms/tvms/
 │   └── tvms_notifications/          ← Notification records + APIs
 ├── page/
 │   ├── tvms_reports/                ← Custom analytics page
-│   └── tvms_timetable/              ← Static timetable grid page
+│   ├── tvms_timetable/              ← Static timetable grid page
+│   └── venue_grid/                  ← Venue availability grid page
 ├── api/
 │   ├── reports.py                   ← Analytics APIs
 │   └── sms_utils.py

@@ -17,6 +17,7 @@ def get_dashboard_stats():
 
 	total_venues  = frappe.db.count("Venue")
 	venues_in_use = frappe.db.count("Venue", {"current_status": "IN-USE"})
+	venues_booked = frappe.db.count("Venue", {"current_status": "BOOKED"})
 
 	sessions_today = frappe.db.count(
 		"Timetable",
@@ -50,7 +51,8 @@ def get_dashboard_stats():
 	return {
 		"total_venues":       total_venues,
 		"venues_in_use":      venues_in_use,
-		"venues_free":        total_venues - venues_in_use,
+		"venues_booked":      venues_booked,
+		"venues_free":        total_venues - venues_in_use - venues_booked,
 		"sessions_today":     sessions_today,
 		"live_now":           live_now,
 		"active_emergency":   active_emergency,

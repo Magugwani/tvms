@@ -41,11 +41,21 @@ class Emergencysession(Document):
 		self._check_lecturer_availability()
 
 	def on_update(self):
-		if self.has_value_changed("status"):
+		if (
+			self.has_value_changed("status")
+			or self.has_value_changed("venue")
+			or self.has_value_changed("start_time")
+			or self.has_value_changed("end_time")
+		):
 			self._update_venue_status()
+
+		if self.has_value_changed("status"):
 			self._send_status_notification()
 			self._notify_crs()
 			self._log_action(_("Status changed to {0}").format(self.status))
+
+	def after_insert(self):
+		self._update_venue_status()
 
 	# --- Status protection ---
 
@@ -64,24 +74,33 @@ class Emergencysession(Document):
 
 	def _update_venue_status(self):
 		"""Keep Venue.current_status in sync with the session lifecycle (FR-23, FR-25)"""
-		if not self.venue:
+		venues = set()
+		if self.venue:
+			venues.add(self.venue)
+
+		old_doc = self.get_doc_before_save()
+		if old_doc and old_doc.venue:
+			venues.add(old_doc.venue)
+
+		if not venues:
 			return
-		venue_status = {
-			"CONFIRMED": "IN-USE",
-			"CANCELLED": "FREE",
-			"EXPIRED":   "FREE",
-			"COMPLETED": "FREE",
-		}.get(self.status)
-		if venue_status:
-			frappe.db.set_value("Venue", self.venue, "current_status", venue_status)
+
+		for venue in venues:
+			venue_doc = frappe.get_doc("Venue", venue)
+			venue_status = venue_doc.compute_status()
+			frappe.db.set_value("Venue", venue, "current_status", venue_status)
+			venue_doc.current_status = venue_status
+
 			# Push live venue status update to Desk pages.
 			frappe.publish_realtime(
 				"venue_status_update",
 				{
-					"venue": self.venue,
+					"venue": venue,
 					"status": venue_status,
 					"session": self.name,
 					"session_status": self.status,
+					"start_time": self.start_time,
+					"end_time": self.end_time,
 				},
 				after_commit=True,
 			)

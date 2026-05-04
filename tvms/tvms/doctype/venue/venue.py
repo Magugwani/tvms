@@ -4,7 +4,7 @@
 import frappe
 from frappe.model.document import Document
 from frappe import _
-from frappe.utils import get_datetime, now_datetime, nowdate
+from frappe.utils import add_days, get_datetime, now_datetime, nowdate
 
 
 class Venue(Document):
@@ -16,10 +16,10 @@ class Venue(Document):
 	def compute_status(self, at_time=None):
 		"""Derive venue status from live session data at the given moment.
 
-		Returns "IN-USE" or "FREE". Does NOT write to the database — call
+		Returns "IN-USE", "BOOKED", or "FREE". Does NOT write to the database — call
 		refresh_status() to persist the result.
 
-		Precedence: CONFIRMED emergency session → active timetable session → FREE.
+		Precedence: active confirmed emergency/timetable → reserved emergency → FREE.
 		"""
 		at = get_datetime(at_time) if at_time else now_datetime()
 
@@ -54,6 +54,21 @@ class Venue(Document):
 			limit=1,
 		):
 			return "IN-USE"
+
+		# Emergency sessions reserve the venue as soon as they are created.
+		# PENDING sessions are still reservations because they block other
+		# scheduling attempts until cancelled, completed, or expired.
+		if frappe.db.get_all(
+			"Emergency session",
+			filters=[
+				["venue", "=", self.name],
+				["status", "in", ["PENDING", "CONFIRMED"]],
+				["end_time", ">", at],
+			],
+			fields=["name"],
+			limit=1,
+		):
+			return "BOOKED"
 
 		return "FREE"
 
@@ -165,6 +180,93 @@ def _venue_has_resources(venue_resources, required):
 	return required.issubset(available)
 
 
+def _format_datetime(value):
+	return str(value)[:16] if value else None
+
+
+def _get_venue_booking_windows(venue_name, at_time=None, limit=5):
+	"""Return current/upcoming bookings for a venue.
+
+	Emergency sessions show exact datetime windows. Timetable rows are expanded
+	to datetime-like strings for display so venue users can see general timetable
+	references beside emergency reservations.
+	"""
+	at = get_datetime(at_time) if at_time else now_datetime()
+	today = at.date()
+	now_time = at.strftime("%H:%M:%S")
+	limit = int(limit or 5)
+
+	emergency_rows = frappe.db.get_all(
+		"Emergency session",
+		filters=[
+			["venue", "=", venue_name],
+			["status", "in", ["PENDING", "CONFIRMED"]],
+			["end_time", ">", at],
+		],
+		fields=["name", "title", "course", "lecturer", "start_time", "end_time", "status"],
+		order_by="start_time asc",
+		limit=limit,
+	)
+
+	timetable_rows = frappe.db.get_all(
+		"Timetable",
+		filters=[
+			["venue", "=", venue_name],
+			["status", "!=", "COMPLETED"],
+			["date", ">=", today],
+		],
+		fields=["name", "course", "lecturer", "date", "start_time", "end_time", "status"],
+		order_by="date asc, start_time asc",
+		limit=limit,
+	)
+	timetable_rows = [
+		row for row in timetable_rows
+		if str(row.get("date")) > str(today) or str(row.get("end_time"))[:8] > now_time
+	]
+
+	course_names = {
+		r["name"]: r["course_name"]
+		for r in frappe.db.get_all("Course", fields=["name", "course_name"])
+	}
+	user_names = {
+		r["name"]: r["full_name"]
+		for r in frappe.db.get_all("User", filters={"enabled": 1}, fields=["name", "full_name"])
+	}
+
+	windows = []
+	for row in emergency_rows:
+		windows.append({
+			"source": "Emergency session",
+			"name": row.name,
+			"title": row.title,
+			"course": row.course,
+			"course_name": course_names.get(row.course) or row.course,
+			"lecturer": row.lecturer,
+			"lecturer_name": user_names.get(row.lecturer) if row.lecturer else None,
+			"start_time": _format_datetime(row.start_time),
+			"end_time": _format_datetime(row.end_time),
+			"status": row.status,
+		})
+
+	for row in timetable_rows:
+		start_time = str(row.start_time)[:8]
+		end_time = str(row.end_time)[:8]
+		windows.append({
+			"source": "Timetable",
+			"name": row.name,
+			"title": course_names.get(row.course) or row.course,
+			"course": row.course,
+			"course_name": course_names.get(row.course) or row.course,
+			"lecturer": row.lecturer,
+			"lecturer_name": user_names.get(row.lecturer) if row.lecturer else None,
+			"start_time": f"{row.date} {start_time[:5]}",
+			"end_time": f"{row.date} {end_time[:5]}",
+			"status": row.status,
+		})
+
+	return sorted(windows, key=lambda row: row["start_time"] or "")[:limit]
+
+
 # ---------------------------------------------------------------
 # FR-62: Real-time availability API
 # ---------------------------------------------------------------
@@ -176,15 +278,25 @@ def get_all_venues(search: str = None):
 	Used by Desk pages and whitelisted integrations.
 	"""
 	filters = []
+	or_filters = []
 	if search:
-		filters.append(["venue_name", "like", f"%{search}%"])
+		or_filters = [
+			["venue_name", "like", f"%{search}%"],
+			["venue_code", "like", f"%{search}%"],
+			["location", "like", f"%{search}%"],
+		]
 
-	return frappe.db.get_all(
+	rows = frappe.db.get_all(
 		"Venue",
 		filters=filters,
+		or_filters=or_filters,
 		fields=["name", "venue_name", "venue_code", "location", "capacity", "resources", "current_status"],
 		order_by="venue_name asc",
 	)
+	for row in rows:
+		row["bookings"] = _get_venue_booking_windows(row.name, limit=3)
+		row["next_booking"] = row["bookings"][0] if row["bookings"] else None
+	return rows
 
 
 @frappe.whitelist(methods=["GET"])
@@ -224,7 +336,32 @@ def get_venue_status(venue: str, at_time: str = None):
 		"live_status": live_status,
 		"stored_status": doc.current_status,
 		"in_sync": live_status == doc.current_status,
+		"bookings": _get_venue_booking_windows(venue, at_time=at_time),
 	}
+
+
+@frappe.whitelist(methods=["GET"])
+def get_venue_grid(search: str = None, status: str = None, date: str = None):
+	"""Return venues with status and booking windows for the Venue Grid page."""
+	frappe.has_permission("Venue", "read", throw=True)
+
+	rows = get_all_venues(search=search)
+	if status:
+		rows = [row for row in rows if (row.current_status or "FREE") == status]
+
+	if date:
+		start = get_datetime(f"{date} 00:00:00")
+		end = get_datetime(f"{add_days(date, 1)} 00:00:00")
+		for row in rows:
+			row["bookings"] = _get_venue_booking_windows(row.name, at_time=start, limit=50)
+			row["bookings"] = [
+				booking for booking in row["bookings"]
+				if booking.get("start_time") and get_datetime(booking["start_time"]) < end
+				and booking.get("end_time") and get_datetime(booking["end_time"]) > start
+			]
+			row["next_booking"] = row["bookings"][0] if row["bookings"] else None
+
+	return rows
 
 
 @frappe.whitelist(methods=["GET"])

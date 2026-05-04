@@ -82,17 +82,24 @@ PENDING → AUTO-EXPIRES (grey) after grace period (if not confirmed)
 - `location` (Text) — Building/floor address
 - `capacity` (Int) — Max occupancy
 - `resources` (Text) — Available equipment (comma-separated)
-- `current_status` (Select) — FREE / IN-USE / EXPIRED (live tracking)
+- `current_status` (Select) — FREE / BOOKED / IN-USE / EXPIRED (live tracking)
 
 **List View** (`venue_list.js`):
-- ✅ Status indicators with color dots (green=FREE, red=IN-USE)
+- ✅ Status indicators with color dots (green=FREE, amber=BOOKED, red=IN-USE)
 - ✅ Search by name, location, code
 - ✅ Filter by capacity range
 - ✅ Sort by status, name, capacity
 
+**Grid View** (`/app/venue-grid`):
+- ✅ Card grid visible to Students, CRs, Lecturers, and admins
+- ✅ Shows venue status, capacity, resources, and upcoming/current booking windows
+- ✅ Emergency sessions mark venues as BOOKED immediately after creation
+- ✅ General timetable entries are shown as venue reference bookings
+
 **Backend APIs** (`venue.py`):
 - `get_all_venues(search=None)` → List all venues with live status
 - `get_all_venue_statuses()` → Status snapshot (dict format: {venue_code: status})
+- `get_venue_grid(search=None, status=None, date=None)` → Venue card grid data
 - `get_available_venues(start_time, end_time, expected_students)` → Find free venues for slot
 - `recommend_venue(expected_students, start_time, end_time, required_resources)` → Smart recommendation (capacity + resources + availability, sorted by best fit)
 - `get_venue_status(venue, at_time=None)` → Check occupancy at specific time
@@ -277,7 +284,8 @@ grace_period = settings.grace_period_minutes
 │   │   │   ├── tvms_reports.json
 │   │   │   ├── tvms_reports.py
 │   │   │   └── tvms_reports.html            ← HTML + JavaScript dashboard
-│   │   └── tvms_timetable/                  ← Static timetable grid page
+│   │   ├── tvms_timetable/                  ← Static timetable grid page
+│   │   └── venue_grid/                      ← Venue availability grid page
 │   │
 │   ├── api/
 │   │   ├── reports.py                       ← Analytics APIs

@@ -66,7 +66,7 @@
    "fieldname": "current_status",
    "fieldtype": "Select",
    "label": "Current Status",
-   "options": "FREE\nIN-USE\nEXPIRED",
+   "options": "FREE\nBOOKED\nIN-USE\nEXPIRED",
    "read_only": 1,
    "in_list_view": 1,
    "default": "FREE"
