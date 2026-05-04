@@ -1,0 +1,10 @@
+.DS_Store
+*.pyc
+*.egg-info
+*.log
+.DS_store
+.env
+*.swp
+tags
+node_modules
+__pycache__

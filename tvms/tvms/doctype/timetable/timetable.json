@@ -1,0 +1,238 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "TT-.YYYY.-.#####",
+ "creation": "2026-04-22 02:53:51.239528",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "session_details_section",
+  "course",
+  "lecturer",
+  "venue",
+  "column_break_xdxr",
+  "date",
+  "day_of_week",
+  "start_time",
+  "end_time",
+  "duration_hours",
+  "status",
+  "academic_context_section",
+  "academic_year",
+  "semester",
+  "student_groups",
+  "fet_metadata_section",
+  "fet_activity_id",
+  "import_batch",
+  "source_file",
+  "imported_at",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "session_details_section",
+   "fieldtype": "Section Break",
+   "label": "Session Details"
+  },
+  {
+   "fieldname": "course",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Course",
+   "options": "Course",
+   "reqd": 1
+  },
+  {
+   "fieldname": "lecturer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Lecturer",
+   "options": "User"
+  },
+  {
+   "fieldname": "venue",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Venue",
+   "options": "Venue"
+  },
+  {
+   "fieldname": "column_break_xdxr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "day_of_week",
+   "fieldtype": "Select",
+   "label": "Day of Week",
+   "options": "\nMonday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday",
+   "read_only": 1
+  },
+  {
+   "fieldname": "start_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Start Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "end_time",
+   "fieldtype": "Time",
+   "label": "End Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "duration_hours",
+   "fieldtype": "Float",
+   "label": "Duration (hrs)",
+   "precision": "1",
+   "read_only": 1
+  },
+  {
+   "default": "SCHEDULED",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "SCHEDULED\nCOMPLETED",
+   "read_only": 1
+  },
+  {
+   "fieldname": "academic_context_section",
+   "fieldtype": "Section Break",
+   "label": "Academic Context"
+  },
+  {
+   "fieldname": "academic_year",
+   "fieldtype": "Data",
+   "label": "Academic Year",
+   "placeholder": "e.g. 2026/2027"
+  },
+  {
+   "fieldname": "semester",
+   "fieldtype": "Select",
+   "label": "Semester",
+   "options": "\nSemester 1\nSemester 2\nTrimester 1\nTrimester 2\nTrimester 3"
+  },
+  {
+   "fieldname": "student_groups",
+   "fieldtype": "Small Text",
+   "label": "Student Groups",
+   "description": "FET Students Set(s) — e.g. CS-Y1-G1, CS-Y1-G2"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "fet_metadata_section",
+   "fieldtype": "Section Break",
+   "label": "FET Import Metadata"
+  },
+  {
+   "fieldname": "fet_activity_id",
+   "fieldtype": "Data",
+   "label": "FET Activity ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "import_batch",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Import Batch",
+   "read_only": 1
+  },
+  {
+   "fieldname": "source_file",
+   "fieldtype": "Data",
+   "label": "Source File",
+   "read_only": 1
+  },
+  {
+   "fieldname": "imported_at",
+   "fieldtype": "Datetime",
+   "label": "Imported At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Timetable",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-05-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "Timetable",
+ "naming_rule": "Autoname",
+ "owner": "maduhumagugwani@gmail.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Department Admin",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Lecturer",
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Student",
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Class Representative (CR)",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "date",
+ "sort_order": "ASC",
+ "states": []
+}

@@ -1,0 +1,176 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-22 03:15:08.751611",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "message",
+  "recipient",
+  "recipient_role",
+  "reference_type",
+  "reference_name",
+  "status",
+  "channel",
+  "sent_at",
+  "read_at",
+  "is_forwarded",
+  "forwarded_at",
+  "forwarded_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title"
+  },
+  {
+   "fieldname": "message",
+   "fieldtype": "Small Text",
+   "label": "Message"
+  },
+  {
+   "fieldname": "recipient",
+   "fieldtype": "Link",
+   "label": "Recipient",
+   "options": "User"
+  },
+  {
+   "fieldname": "recipient_role",
+   "fieldtype": "Select",
+   "label": "Recipient Role",
+   "options": "Lecturer\nClass Representative(CR)\nStudents"
+  },
+  {
+   "fieldname": "reference_type",
+   "fieldtype": "Link",
+   "label": "Reference Type",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Name",
+   "options": "reference_type"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "PENDING\nSENT\nREAD\nFAILED"
+  },
+  {
+   "fieldname": "channel",
+   "fieldtype": "Select",
+   "label": "Channel",
+   "options": "E-mail\nSMS"
+  },
+  {
+   "fieldname": "sent_at",
+   "fieldtype": "Datetime",
+   "label": "Sent At"
+  },
+  {
+   "fieldname": "read_at",
+   "fieldtype": "Datetime",
+   "label": "Read At"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_forwarded",
+   "fieldtype": "Check",
+   "label": "Forwarded to Students",
+   "read_only": 1
+  },
+  {
+   "fieldname": "forwarded_at",
+   "fieldtype": "Datetime",
+   "label": "Forwarded At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "forwarded_by",
+   "fieldtype": "Link",
+   "label": "Forwarded By",
+   "options": "User",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-27 18:45:11.731572",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "Tvms Notifications",
+ "owner": "maduhumagugwani@gmail.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Administrator",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Class Representative (CR)",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Lecturer",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Student",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

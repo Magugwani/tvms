@@ -1,0 +1,155 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:venue_code",
+ "creation": "2026-04-22 01:23:19.250859",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_wvj2",
+  "amended_from",
+  "venue_name",
+  "location",
+  "capacity",
+  "column_break_ijyc",
+  "venue_code",
+  "resources",
+  "current_status"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_wvj2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Venue",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "venue_name",
+   "fieldtype": "Data",
+   "label": "Venue name"
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Location",
+   "description": "Building, floor, or physical address (e.g. Block A, 2nd Floor)"
+  },
+  {
+   "fieldname": "capacity",
+   "fieldtype": "Int",
+   "label": "Capacity"
+  },
+  {
+   "fieldname": "column_break_ijyc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "venue_code",
+   "fieldtype": "Data",
+   "label": "Venue code",
+   "unique": 1
+  },
+  {
+   "fieldname": "resources",
+   "fieldtype": "Data",
+   "label": "Resources"
+  },
+  {
+   "fieldname": "current_status",
+   "fieldtype": "Select",
+   "label": "Current Status",
+   "options": "FREE\nIN-USE\nEXPIRED",
+   "read_only": 1,
+   "in_list_view": 1,
+   "default": "FREE"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-05-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "Venue",
+ "naming_rule": "By fieldname",
+ "owner": "maduhumagugwani@gmail.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Administrator",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Department Admin",
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Lecturer",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Class Representative (CR)",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Student",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

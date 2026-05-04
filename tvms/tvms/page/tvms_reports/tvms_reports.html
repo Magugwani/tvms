@@ -1,0 +1,269 @@
+{% extends "frappe/templates/web.html" %}
+
+{% block title %}{{ _("TVMS Analytics & Reports") }}{% endblock %}
+
+{% block page_content %}
+<div class="container" style="margin-top: 20px;">
+	<!-- Header -->
+	<div class="page-head">
+		<h2 style="display: inline-block;">{{ _("Analytics & Reports") }}</h2>
+		<p class="text-muted">{{ _("Venue utilization, peak hours, and session summaries") }}</p>
+	</div>
+
+	<!-- Date Range Filter -->
+	<div style="margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 6px;">
+		<label>{{ _("Date Range") }}:</label>
+		<input type="date" id="date-from" style="margin-right: 10px; padding: 6px;">
+		<input type="date" id="date-to" style="margin-right: 10px; padding: 6px;">
+		<button id="apply-filter" class="btn btn-primary">{{ _("Apply") }}</button>
+		<button id="export-util" class="btn btn-secondary" style="float: right;">{{ _("Export Utilization CSV") }}</button>
+	</div>
+
+	<!-- Live Stats -->
+	<div id="stats-cards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0;">
+		<div class="loading-stat">{{ _("Loading...") }}</div>
+	</div>
+
+	<!-- Peak Hours Chart -->
+	<div style="background: white; border: 1px solid #ddd; border-radius: 6px; padding: 20px; margin: 20px 0;">
+		<h4>{{ _("Peak Usage Hours") }}</h4>
+		<canvas id="peak-hours-chart" style="height: 300px;"></canvas>
+	</div>
+
+	<!-- Venue Utilization Table -->
+	<div style="background: white; border: 1px solid #ddd; border-radius: 6px; padding: 20px; margin: 20px 0;">
+		<h4 style="margin-bottom: 15px;">{{ _("Venue Utilization") }}</h4>
+		<table id="util-table" class="table table-bordered table-striped" style="margin-bottom: 0;">
+			<thead>
+				<tr>
+					<th>{{ _("Venue") }}</th>
+					<th>{{ _("Location") }}</th>
+					<th>{{ _("Capacity") }}</th>
+					<th>{{ _("Hours Used") }}</th>
+					<th>{{ _("Utilization") }}</th>
+					<th>{{ _("Status") }}</th>
+				</tr>
+			</thead>
+			<tbody id="util-tbody">
+				<tr><td colspan="6" style="text-align: center;">{{ _("Loading...") }}</td></tr>
+			</tbody>
+		</table>
+	</div>
+
+	<!-- Session Summary Table -->
+	<div style="background: white; border: 1px solid #ddd; border-radius: 6px; padding: 20px; margin: 20px 0;">
+		<h4 style="margin-bottom: 15px;">{{ _("Session Summary by Course") }}</h4>
+		<table id="sess-table" class="table table-bordered table-striped" style="margin-bottom: 0;">
+			<thead>
+				<tr>
+					<th>{{ _("Course") }}</th>
+					<th>{{ _("Sessions") }}</th>
+					<th>{{ _("Total Hours") }}</th>
+					<th>{{ _("Avg Duration") }}</th>
+				</tr>
+			</thead>
+			<tbody id="sess-tbody">
+				<tr><td colspan="4" style="text-align: center;">{{ _("Loading...") }}</td></tr>
+			</tbody>
+		</table>
+	</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.0.0/dist/chart.min.js"></script>
+<script>
+frappe.provide('tvms.reports');
+
+const today = new Date();
+const thirtyAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+$('#date-from').val(thirtyAgo.toISOString().split('T')[0]);
+$('#date-to').val(today.toISOString().split('T')[0]);
+
+// Load initial data
+loadAll();
+
+$('#apply-filter').click(loadAll);
+
+function loadAll() {
+	loadStats();
+	loadUtil();
+	loadPeak();
+	loadSessions();
+}
+
+function getDateRange() {
+	return {
+		date_from: $('#date-from').val(),
+		date_to: $('#date-to').val(),
+	};
+}
+
+function loadStats() {
+	frappe.call({
+		method: 'tvms.tvms.api.reports.get_dashboard_stats',
+		callback: (r) => {
+			if (!r.message) return;
+			const s = r.message;
+			const html = `
+				<div style="background: white; padding: 20px; border-radius: 6px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<div style="font-size: 24px; font-weight: bold; color: #0066cc;">${s.total_venues}</div>
+					<div style="font-size: 12px; color: #666;">Total Venues</div>
+				</div>
+				<div style="background: white; padding: 20px; border-radius: 6px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<div style="font-size: 24px; font-weight: bold; color: #cc0000;">${s.venues_in_use}</div>
+					<div style="font-size: 12px; color: #666;">In Use Now</div>
+				</div>
+				<div style="background: white; padding: 20px; border-radius: 6px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<div style="font-size: 24px; font-weight: bold; color: #00cc00;">${s.venues_free}</div>
+					<div style="font-size: 12px; color: #666;">Free Now</div>
+				</div>
+				<div style="background: white; padding: 20px; border-radius: 6px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+					<div style="font-size: 24px; font-weight: bold; color: #ffaa00;">${s.live_now}</div>
+					<div style="font-size: 12px; color: #666;">Live Sessions</div>
+				</div>
+			`;
+			$('#stats-cards').html(html);
+		}
+	});
+}
+
+function loadUtil() {
+	const dr = getDateRange();
+	frappe.call({
+		method: 'tvms.tvms.api.reports.get_venue_utilization',
+		args: dr,
+		callback: (r) => {
+			if (!r.message) return;
+			let html = '';
+			r.message.forEach(v => {
+				const pctColor = v.utilization_pct >= 80 ? '#cc0000' : v.utilization_pct >= 50 ? '#ff9900' : '#00cc00';
+				html += `
+					<tr>
+						<td><strong>${v.venue_name}</strong></td>
+						<td>${v.location || '—'}</td>
+						<td>${v.capacity || '—'}</td>
+						<td>${v.hours_used}h</td>
+						<td>
+							<div style="background: #eee; height: 20px; border-radius: 3px; overflow: hidden;">
+								<div style="background: ${pctColor}; height: 100%; width: ${v.utilization_pct}%; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: bold;">${v.utilization_pct}%</div>
+							</div>
+						</td>
+						<td><span class="badge ${v.current_status === 'IN-USE' ? 'badge-danger' : 'badge-success'}">${v.current_status || 'FREE'}</span></td>
+					</tr>
+				`;
+			});
+			$('#util-tbody').html(html || '<tr><td colspan="6">No data</td></tr>');
+		}
+	});
+}
+
+function loadPeak() {
+	const dr = getDateRange();
+	frappe.call({
+		method: 'tvms.tvms.api.reports.get_peak_hours',
+		args: dr,
+		callback: (r) => {
+			if (!r.message) return;
+			const labels = r.message.map(h => h.label);
+			const data = r.message.map(h => h.count);
+
+			const ctx = document.getElementById('peak-hours-chart').getContext('2d');
+			if (window.peakChart) window.peakChart.destroy();
+
+			window.peakChart = new Chart(ctx, {
+				type: 'bar',
+				data: {
+					labels: labels,
+					datasets: [{
+						label: 'Session Count',
+						data: data,
+						backgroundColor: '#0066cc',
+						borderColor: '#0050aa',
+						borderWidth: 1,
+					}],
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: true,
+					plugins: { legend: { display: false } },
+					scales: {
+						y: { beginAtZero: true },
+					},
+				},
+			});
+		}
+	});
+}
+
+function loadSessions() {
+	const dr = getDateRange();
+	frappe.call({
+		method: 'tvms.tvms.api.reports.get_session_summary',
+		args: dr,
+		callback: (r) => {
+			if (!r.message) return;
+			let html = '';
+			let totSessions = 0, totHours = 0;
+			r.message.forEach(s => {
+				html += `
+					<tr>
+						<td><strong>${s.course_name || s.course}</strong></td>
+						<td style="text-align: right;">${s.sessions}</td>
+						<td style="text-align: right;">${s.total_hours.toFixed(1)}h</td>
+						<td style="text-align: right;">${s.sessions ? (s.total_hours / s.sessions).toFixed(1) : '—'}h</td>
+					</tr>
+				`;
+				totSessions += s.sessions;
+				totHours += s.total_hours;
+			});
+			if (r.message.length > 0) {
+				html += `
+					<tr style="background: #f9f9f9; font-weight: bold;">
+						<td>Total</td>
+						<td style="text-align: right;">${totSessions}</td>
+						<td style="text-align: right;">${totHours.toFixed(1)}h</td>
+						<td></td>
+					</tr>
+				`;
+			}
+			$('#sess-tbody').html(html || '<tr><td colspan="4">No data</td></tr>');
+		}
+	});
+}
+
+$('#export-util').click(() => {
+	const dr = getDateRange();
+	frappe.call({
+		method: 'tvms.tvms.api.reports.get_venue_utilization',
+		args: dr,
+		callback: (r) => {
+			if (!r.message) return;
+			const csv = [
+				'Venue,Name,Location,Capacity,Hours Used,Available Hours,Utilization %,Status',
+				...r.message.map(v => `${v.venue},"${v.venue_name}","${v.location || ''}",${v.capacity},${v.hours_used},${v.available_hours},${v.utilization_pct},${v.current_status || 'FREE'}`),
+			].join('\n');
+
+			const blob = new Blob([csv], { type: 'text/csv' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `tvms_venue_utilization_${new Date().toISOString().split('T')[0]}.csv`;
+			a.click();
+			URL.revokeObjectURL(url);
+		}
+	});
+});
+</script>
+
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.page-head { margin-bottom: 30px; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
+.badge { padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; }
+.badge-danger { background: #fee; color: #c00; }
+.badge-success { background: #efe; color: #0a0; }
+table { width: 100%; }
+td { padding: 10px; }
+</style>
+{% endblock %}
