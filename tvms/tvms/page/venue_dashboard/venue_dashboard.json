@@ -7,9 +7,9 @@
  "modified": "2026-05-04 12:30:00.000000",
  "modified_by": "Administrator",
  "module": "tvms",
- "name": "venue-grid",
+ "name": "venue-dashboard",
  "owner": "Administrator",
- "page_name": "venue-grid",
+ "page_name": "venue-dashboard",
  "roles": [
   {
    "role": "System Manager"

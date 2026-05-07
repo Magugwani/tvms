@@ -1,4 +1,9 @@
 frappe.listview_settings['Venue'] = {
+	onload(listview) {
+		listview.page.add_inner_button(__('Dashboard View'), () => {
+			frappe.set_route('venue-dashboard');
+		});
+	},
 	colwidth: {
 		name: 12,
 		venue_name: 25,

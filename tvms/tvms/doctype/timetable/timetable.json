@@ -1,7 +1,7 @@
 {
  "actions": [],
- "allow_rename": 0,
- "autoname": "TT-.YYYY.-.#####",
+ "allow_rename": 1,
+ "autoname": "TIMETABLE-.####",
  "creation": "2026-04-22 02:53:51.239528",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -76,14 +76,14 @@
   },
   {
    "fieldname": "start_time",
-   "fieldtype": "Time",
+   "fieldtype": "Datetime",
    "in_list_view": 1,
    "label": "Start Time",
    "reqd": 1
   },
   {
    "fieldname": "end_time",
-   "fieldtype": "Time",
+   "fieldtype": "Datetime",
    "label": "End Time",
    "reqd": 1
   },
@@ -121,10 +121,10 @@
    "options": "\nSemester 1\nSemester 2\nTrimester 1\nTrimester 2\nTrimester 3"
   },
   {
+   "description": "FET Students Set(s) \u2014 e.g. CS-Y1-G1, CS-Y1-G2",
    "fieldname": "student_groups",
    "fieldtype": "Small Text",
-   "label": "Student Groups",
-   "description": "FET Students Set(s) — e.g. CS-Y1-G1, CS-Y1-G2"
+   "label": "Student Groups"
   },
   {
    "collapsible": 1,
@@ -171,11 +171,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-01 00:00:00.000000",
+ "modified": "2026-05-04 22:51:19.009939",
  "modified_by": "Administrator",
  "module": "tvms",
  "name": "Timetable",
- "naming_rule": "Autoname",
+ "naming_rule": "Expression",
  "owner": "maduhumagugwani@gmail.com",
  "permissions": [
   {

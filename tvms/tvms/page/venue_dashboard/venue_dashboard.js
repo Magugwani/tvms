@@ -1,11 +1,11 @@
-frappe.pages["venue-grid"].on_page_load = function (wrapper) {
-	frappe.venue_grid = new TVMSVenueGrid(wrapper);
+frappe.pages["venue-dashboard"].on_page_load = function (wrapper) {
+	frappe.venue_dashboard = new TVMSVenueGrid(wrapper);
 };
 
-frappe.pages["venue-grid"].on_page_show = function () {
-	if (frappe.venue_grid) {
-		frappe.venue_grid.apply_route_options();
-		frappe.venue_grid.load();
+frappe.pages["venue-dashboard"].on_page_show = function () {
+	if (frappe.venue_dashboard) {
+		frappe.venue_dashboard.apply_route_options();
+		frappe.venue_dashboard.load();
 	}
 };
 
@@ -13,7 +13,7 @@ class TVMSVenueGrid {
 	constructor(wrapper) {
 		frappe.ui.make_app_page({
 			parent: wrapper,
-			title: __("Venue Grid"),
+			title: __("Venue Dashboard"),
 			single_column: true,
 		});
 
@@ -69,18 +69,35 @@ class TVMSVenueGrid {
 				margin-bottom: 12px;
 			}
 			.tvms-venue-summary {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 8px;
+				display: grid;
+				grid-template-columns: repeat(4, minmax(140px, 1fr));
+				gap: 12px;
 				margin-bottom: 12px;
 			}
-			.tvms-venue-pill {
+			.tvms-stat-card {
 				border: 1px solid var(--border-color);
-				border-radius: 999px;
-				background: var(--fg-color);
-				padding: 5px 10px;
+				border-radius: 8px;
+				background: var(--card-bg);
+				padding: 14px;
+				text-align: center;
+				cursor: pointer;
+			}
+			.tvms-stat-card:hover {
+				box-shadow: var(--shadow-sm);
+			}
+			.tvms-stat-card.active {
+				border-color: var(--primary);
+				box-shadow: 0 0 0 1px var(--primary);
+			}
+			.tvms-stat-label {
 				font-size: 12px;
 				color: var(--text-muted);
+				margin-bottom: 4px;
+			}
+			.tvms-stat-value {
+				font-size: 22px;
+				font-weight: 700;
+				color: var(--text-color);
 			}
 			.tvms-venue-grid {
 				display: grid;
@@ -150,6 +167,7 @@ class TVMSVenueGrid {
 			}
 			@media (max-width: 780px) {
 				.tvms-venue-filter-bar { grid-template-columns: 1fr; }
+				.tvms-venue-summary { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
 			}
 		</style>`).appendTo("head");
 	}
@@ -182,14 +200,18 @@ class TVMSVenueGrid {
 
 	async load() {
 		const filters = this.get_filters();
+		const summary_filters = Object.assign({}, filters, { status: "" });
 		this.$body.find(".tvms-venue-grid").html(`<div class="tvms-empty">${__("Loading venues...")}</div>`);
 
-		const venues = await frappe.xcall("tvms.tvms.doctype.venue.venue.get_venue_grid", filters);
-		this.render(venues || []);
+		const [summary_venues, venues] = await Promise.all([
+			frappe.xcall("tvms.tvms.doctype.venue.venue.get_venue_dashboard", summary_filters),
+			frappe.xcall("tvms.tvms.doctype.venue.venue.get_venue_dashboard", filters),
+		]);
+		this.render(venues || [], summary_venues || []);
 	}
 
-	render(venues) {
-		this.render_summary(venues);
+	render(venues, summary_venues) {
+		this.render_summary(summary_venues);
 		if (!venues.length) {
 			this.$body.find(".tvms-venue-grid").html(`<div class="tvms-empty">${__("No venues found for the selected filters.")}</div>`);
 			return;
@@ -211,13 +233,26 @@ class TVMSVenueGrid {
 			acc[status] = (acc[status] || 0) + 1;
 			return acc;
 		}, {});
+		const current_status = this.$body.find("[data-filter='status']").val() || "";
+		const cards = [
+			{ label: __("Total"), value: venues.length, status: "" },
+			{ label: __("Free"), value: counts.FREE || 0, status: "FREE" },
+			{ label: __("Booked"), value: counts.BOOKED || 0, status: "BOOKED" },
+			{ label: __("In Use"), value: counts["IN-USE"] || 0, status: "IN-USE" },
+		];
 
-		this.$body.find(".tvms-venue-summary").html(`
-			<span class="tvms-venue-pill">${__("Venues")}: ${venues.length}</span>
-			<span class="tvms-venue-pill">${__("Free")}: ${counts.FREE || 0}</span>
-			<span class="tvms-venue-pill">${__("Booked")}: ${counts.BOOKED || 0}</span>
-			<span class="tvms-venue-pill">${__("In Use")}: ${counts["IN-USE"] || 0}</span>
-		`);
+		this.$body.find(".tvms-venue-summary").html(cards.map((card) => `
+			<div class="tvms-stat-card ${current_status === card.status ? "active" : ""}" data-status-filter="${frappe.utils.escape_html(card.status)}">
+				<div class="tvms-stat-label">${frappe.utils.escape_html(card.label)}</div>
+				<div class="tvms-stat-value">${frappe.utils.escape_html(card.value)}</div>
+			</div>
+		`).join(""));
+
+		this.$body.find("[data-status-filter]").on("click", (event) => {
+			const status = $(event.currentTarget).data("status-filter") || "";
+			this.$body.find("[data-filter='status']").val(status);
+			this.load();
+		});
 	}
 
 	card(venue) {

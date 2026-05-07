@@ -5,8 +5,8 @@ frappe.ui.form.on("Venue", {
 	refresh(frm) {
 		if (frm.is_new()) return;
 
-		frm.add_custom_button(__("Venue Grid"), () => {
-			frappe.set_route("venue-grid");
+		frm.add_custom_button(__("Venue Dashboard"), () => {
+			frappe.set_route("venue-dashboard");
 		}, __("References"));
 
 		frm.add_custom_button(__("View Timetable"), () => {

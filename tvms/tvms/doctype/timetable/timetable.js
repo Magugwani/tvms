@@ -59,13 +59,40 @@ function _open_import_dialog() {
 			},
 			{ fieldtype: "Section Break" },
 			{
+				fieldtype: "HTML",
+				fieldname: "upload_html",
+				options: `<div style="margin-bottom:10px">
+					<label class="control-label">${__("Upload CSV File from Device")}</label>
+					<div style="margin-top:6px;display:flex;align-items:center;gap:10px">
+						<button class="btn btn-default btn-sm" id="tvms-upload-csv-btn" type="button">
+							<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+								fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+								stroke-linejoin="round" style="vertical-align:middle;margin-right:5px">
+								<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+								<polyline points="17 8 12 3 7 8"/>
+								<line x1="12" y1="3" x2="12" y2="15"/>
+							</svg>
+							${__("Choose File")}
+						</button>
+						<span id="tvms-upload-csv-name" style="font-size:12px;color:var(--text-muted)">
+							${__("No file chosen")}
+						</span>
+					</div>
+					<input type="file" id="tvms-upload-csv-input" accept=".csv,.txt" style="display:none">
+					<p class="help-box small text-muted" style="margin-top:6px">
+						${__("Selecting a file will fill the CSV text area below automatically.")}
+					</p>
+				</div>`,
+			},
+			{
 				fieldname: "file_content",
 				fieldtype: "Code",
 				label: __("FET Activities CSV"),
 				options: "Plain Text",
 				reqd: 1,
 				description: __(
-					"Paste the contents of your FET-generated activities CSV file here. "
+					"Paste the contents of your FET-generated activities CSV file here, "
+					+ "or use the upload button above. "
 					+ "Both semicolon (;) and comma (,) delimiters are supported."
 				),
 			},
@@ -81,6 +108,31 @@ function _open_import_dialog() {
 		},
 	});
 	d.show();
+	_bind_upload_button(d);
+}
+
+function _bind_upload_button(d) {
+	const $btn   = d.$wrapper.find("#tvms-upload-csv-btn");
+	const $input = d.$wrapper.find("#tvms-upload-csv-input");
+	const $name  = d.$wrapper.find("#tvms-upload-csv-name");
+
+	$btn.on("click", () => $input.trigger("click"));
+
+	$input.on("change", function () {
+		const file = this.files && this.files[0];
+		if (!file) return;
+
+		$name.text(file.name);
+
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			d.set_value("file_content", e.target.result || "");
+		};
+		reader.onerror = () => {
+			frappe.msgprint(__("Could not read the selected file."));
+		};
+		reader.readAsText(file);
+	});
 }
 
 function _run_import(values) {

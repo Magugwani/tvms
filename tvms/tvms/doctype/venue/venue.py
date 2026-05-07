@@ -341,8 +341,8 @@ def get_venue_status(venue: str, at_time: str = None):
 
 
 @frappe.whitelist(methods=["GET"])
-def get_venue_grid(search: str = None, status: str = None, date: str = None):
-	"""Return venues with status and booking windows for the Venue Grid page."""
+def get_venue_dashboard(search: str = None, status: str = None, date: str = None):
+	"""Return venues with status and booking windows for the Venue Dashboard page."""
 	frappe.has_permission("Venue", "read", throw=True)
 
 	rows = get_all_venues(search=search)
