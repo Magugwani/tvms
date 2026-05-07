@@ -489,7 +489,7 @@ def _resolve_soft(field_type, raw_value, warnings):
 # Existing read APIs
 # ==================================================================
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_week_timetable(
 	week_start: str,
 	lecturer: str = None,
@@ -572,7 +572,7 @@ def get_week_timetable(
 	return sessions
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_filter_options():
 	"""Return distinct lecturers, venues, courses, and programs for filter dropdowns."""
 	frappe.has_permission("Timetable", "read", throw=True)
@@ -617,7 +617,7 @@ def get_filter_options():
 	}
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_programs():
 	"""Return all distinct programs from the Course table."""
 	return frappe.db.sql_list(
@@ -626,7 +626,7 @@ def get_programs():
 	)
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_current_user_context():
 	"""Return the current user's role context for Desk/page integrations."""
 	user = frappe.session.user

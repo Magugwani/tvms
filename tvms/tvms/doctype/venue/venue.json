@@ -37,10 +37,10 @@
    "label": "Venue name"
   },
   {
+   "description": "Building, floor, or physical address (e.g. Block A, 2nd Floor)",
    "fieldname": "location",
    "fieldtype": "Data",
-   "label": "Location",
-   "description": "Building, floor, or physical address (e.g. Block A, 2nd Floor)"
+   "label": "Location"
   },
   {
    "fieldname": "capacity",
@@ -63,20 +63,21 @@
    "label": "Resources"
   },
   {
+   "default": "FREE",
    "fieldname": "current_status",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Current Status",
    "options": "FREE\nBOOKED\nIN-USE\nEXPIRED",
-   "read_only": 1,
-   "in_list_view": 1,
-   "default": "FREE"
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
+ "hide_toolbar": 1,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-01 00:00:00.000000",
+ "modified": "2026-05-07 21:21:50.284561",
  "modified_by": "Administrator",
  "module": "tvms",
  "name": "Venue",

@@ -6,6 +6,15 @@ from frappe.model.document import Document
 from frappe import _
 from frappe.utils import add_days, get_datetime, now_datetime, nowdate
 
+VENUE_VIEW_ROLES = {
+	"System Manager",
+	"Administrator",
+	"Department Admin",
+	"Lecturer",
+	"Class Representative (CR)",
+	"Student",
+}
+
 
 class Venue(Document):
 
@@ -184,6 +193,16 @@ def _format_datetime(value):
 	return str(value)[:16] if value else None
 
 
+def _ensure_venue_view_access():
+	"""Allow venue dashboard readers by role, with read permission as a fallback."""
+	user_roles = set(frappe.get_roles())
+	if user_roles.intersection(VENUE_VIEW_ROLES):
+		return
+	if frappe.has_permission("Venue", "read"):
+		return
+	frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+
 def _get_venue_booking_windows(venue_name, at_time=None, limit=5):
 	"""Return current/upcoming bookings for a venue.
 
@@ -271,12 +290,14 @@ def _get_venue_booking_windows(venue_name, at_time=None, limit=5):
 # FR-62: Real-time availability API
 # ---------------------------------------------------------------
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_all_venues(search: str = None):
 	"""Return all venues with full details including live status.
 
 	Used by Desk pages and whitelisted integrations.
 	"""
+	_ensure_venue_view_access()
+
 	filters = []
 	or_filters = []
 	if search:
@@ -299,13 +320,15 @@ def get_all_venues(search: str = None):
 	return rows
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_all_venue_statuses():
 	"""Return the stored current_status for every venue.
 
 	Used by Desk pages for the initial venue status snapshot.
 	Subsequent updates arrive via the venue_status_update WebSocket event.
 	"""
+	_ensure_venue_view_access()
+
 	rows = frappe.db.get_all(
 		"Venue",
 		fields=["name", "venue_name", "current_status"],
@@ -314,7 +337,7 @@ def get_all_venue_statuses():
 	# Return as a dict keyed by venue name for O(1) lookups in Desk page scripts.
 	return {r["name"]: r["current_status"] or "FREE" for r in rows}
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_venue_status(venue: str, at_time: str = None):
 	"""Return the live status of a single venue.
 
@@ -322,6 +345,8 @@ def get_venue_status(venue: str, at_time: str = None):
 	  venue    — Venue name (venue_code)
 	  at_time  — ISO datetime; defaults to now
 	"""
+	_ensure_venue_view_access()
+
 	if not frappe.db.exists("Venue", venue):
 		frappe.throw(_("Venue not found: {0}").format(venue), frappe.DoesNotExistError)
 
@@ -340,10 +365,10 @@ def get_venue_status(venue: str, at_time: str = None):
 	}
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_venue_dashboard(search: str = None, status: str = None, date: str = None):
 	"""Return venues with status and booking windows for the Venue Dashboard page."""
-	frappe.has_permission("Venue", "read", throw=True)
+	_ensure_venue_view_access()
 
 	rows = get_all_venues(search=search)
 	if status:
@@ -364,7 +389,7 @@ def get_venue_dashboard(search: str = None, status: str = None, date: str = None
 	return rows
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_available_venues(start_time: str, end_time: str, expected_students: int = None):
 	"""FR-62: Return all venues with no conflict in [start_time, end_time).
 
@@ -396,7 +421,7 @@ def get_available_venues(start_time: str, end_time: str, expected_students: int 
 # FR-63: Smart venue recommendation
 # ---------------------------------------------------------------
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def recommend_venue(
 	expected_students: int,
 	start_time: str,
