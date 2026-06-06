@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "EMS-.YYYY.-.#####",
+ "autoname": "EMS-.####",
  "creation": "2026-04-22 01:42:06.539528",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -43,11 +43,11 @@
    "options": "User"
   },
   {
+   "depends_on": "eval:doc.role_type != 'Lecturer'",
    "fieldname": "lecturer",
    "fieldtype": "Link",
    "label": "Lecturer",
-   "options": "User",
-   "depends_on": "eval:doc.role_type != 'Lecturer'"
+   "options": "User"
   },
   {
    "fieldname": "role_type",
@@ -78,10 +78,10 @@
    "read_only": 1
   },
   {
+   "description": "Comma-separated resources needed (e.g. Projector, Whiteboard, Lab computers)",
    "fieldname": "required_resources",
    "fieldtype": "Small Text",
-   "label": "Required Resources",
-   "description": "Comma-separated resources needed (e.g. Projector, Whiteboard, Lab computers)"
+   "label": "Required Resources"
   },
   {
    "fieldname": "time_details_and_status_section",
@@ -101,10 +101,9 @@
   {
    "fieldname": "status",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Status",
-   "options": "PENDING\nCONFIRMED\nCANCELLED\nCOMPLETED\nEXPIRED",
-   "read_only": 1,
-   "in_list_view": 1
+   "options": "PENDING\nCONFIRMED\nCANCELLED\nCOMPLETED\nEXPIRED"
   },
   {
    "fieldname": "comment",
@@ -139,13 +138,12 @@
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "is_submittable": 0,
  "links": [],
- "modified": "2026-05-01 00:00:00.000000",
+ "modified": "2026-05-09 22:16:40.509738",
  "modified_by": "Administrator",
  "module": "tvms",
  "name": "Emergency session",
- "naming_rule": "Autoname",
+ "naming_rule": "Expression",
  "owner": "maduhumagugwani@gmail.com",
  "permissions": [
   {

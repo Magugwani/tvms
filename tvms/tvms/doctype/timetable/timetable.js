@@ -5,7 +5,7 @@ frappe.ui.form.on("Timetable", {
 	refresh(frm) {
 		_set_status_indicator(frm);
 
-		frm.add_custom_button(__("Static Timetable"), () => {
+		frm.add_custom_button(__("Timetable"), () => {
 			frappe.set_route("tvms-timetable");
 		}, __("View"));
 

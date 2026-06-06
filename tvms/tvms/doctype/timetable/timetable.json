@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "TIMETABLE-.####",
  "creation": "2026-04-22 02:53:51.239528",
@@ -7,6 +8,8 @@
  "engine": "InnoDB",
  "field_order": [
   "session_details_section",
+  "department",
+  "program",
   "course",
   "lecturer",
   "venue",
@@ -20,7 +23,9 @@
   "academic_context_section",
   "academic_year",
   "semester",
-  "student_groups",
+  "column_break_ebhb",
+  "year_level",
+  "students_groups",
   "fet_metadata_section",
   "fet_activity_id",
   "import_batch",
@@ -76,14 +81,14 @@
   },
   {
    "fieldname": "start_time",
-   "fieldtype": "Datetime",
+   "fieldtype": "Time",
    "in_list_view": 1,
    "label": "Start Time",
    "reqd": 1
   },
   {
    "fieldname": "end_time",
-   "fieldtype": "Datetime",
+   "fieldtype": "Time",
    "label": "End Time",
    "reqd": 1
   },
@@ -119,12 +124,6 @@
    "fieldtype": "Select",
    "label": "Semester",
    "options": "\nSemester 1\nSemester 2\nTrimester 1\nTrimester 2\nTrimester 3"
-  },
-  {
-   "description": "FET Students Set(s) \u2014 e.g. CS-Y1-G1, CS-Y1-G2",
-   "fieldname": "student_groups",
-   "fieldtype": "Small Text",
-   "label": "Student Groups"
   },
   {
    "collapsible": 1,
@@ -166,12 +165,38 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Data",
+   "label": "Department"
+  },
+  {
+   "fieldname": "program",
+   "fieldtype": "Data",
+   "label": "Program"
+  },
+  {
+   "fieldname": "column_break_ebhb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "year_level",
+   "fieldtype": "Data",
+   "label": "Year Level"
+  },
+  {
+   "description": "FET Students Set(s) \u2014 e.g. CS-Y1-G1, CS-Y1-G2",
+   "fieldname": "students_groups",
+   "fieldtype": "Data",
+   "label": "Students Groups",
+   "unique": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-04 22:51:19.009939",
+ "modified": "2026-05-11 09:27:47.905591",
  "modified_by": "Administrator",
  "module": "tvms",
  "name": "Timetable",

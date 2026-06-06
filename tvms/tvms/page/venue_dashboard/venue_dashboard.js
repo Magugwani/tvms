@@ -27,7 +27,7 @@ class TVMSVenueGrid {
 	build() {
 		this.page.set_primary_action(__("Refresh"), () => this.load(), "refresh");
 		this.page.add_inner_button(__("Venue List"), () => frappe.set_route("List", "Venue"));
-		this.page.add_inner_button(__("Static Timetable"), () => frappe.set_route("tvms-timetable"));
+		this.page.add_inner_button(__("General Timetable"), () => frappe.set_route("tvms-timetable"));
 
 		this.$body = $(`
 			<div class="tvms-venue-grid-page">

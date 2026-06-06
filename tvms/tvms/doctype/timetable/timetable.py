@@ -69,8 +69,8 @@ class Timetable(Document):
 
 	def _compute_duration(self):
 		if self.start_time and self.end_time:
-			start = datetime.strptime(str(self.start_time)[:8], "%H:%M:%S")
-			end = datetime.strptime(str(self.end_time)[:8], "%H:%M:%S")
+			start = datetime.strptime(str(self.start_time), "%H:%M:%S")
+			end = datetime.strptime(str(self.end_time), "%H:%M:%S")
 			delta = (end - start).total_seconds() / 3600
 			self.duration_hours = round(delta, 1)
 
@@ -176,6 +176,8 @@ def import_from_fet_csv(
 	end_date   = getdate(semester_end)
 	if start_date > end_date:
 		frappe.throw(_("Semester start must be before semester end"))
+	if start_date.weekday() != 0:
+		frappe.throw(_("Semester start must be a Monday"))
 
 	# All Monday dates within the semester range
 	week_starts = []
@@ -230,7 +232,7 @@ def import_from_fet_csv(
 			try:
 				name = _create_entry(
 					resolved, week_date, batch_id, imported_at_ts,
-					academic_year, semester, source_file,
+					academic_year, semester, source_file, end_date,
 				)
 				if name:
 					imported += 1
@@ -286,9 +288,16 @@ def _resolve_row(row):
 	if day_offset is None:
 		frappe.throw(_("Unrecognised day name: '{0}'").format(day))
 
-	start_time   = _parse_time(hour)
-	duration_val = float(duration) if duration else 1.0
-	end_time     = _offset_time(start_time, duration_val)
+	try:
+		start_time = _parse_time(hour)
+	except ValueError:
+		frappe.throw(_("Invalid start time: '{0}'").format(hour))
+
+	try:
+		duration_val = float(duration) if duration else 1.0
+	except ValueError:
+		frappe.throw(_("Invalid duration: '{0}'").format(duration))
+	end_time = _offset_time(start_time, duration_val)
 
 	course = _resolve_course(subject)
 
@@ -311,16 +320,18 @@ def _resolve_row(row):
 
 
 def _create_entry(resolved, week_start_date, batch_id, imported_at_ts,
-				  academic_year, semester, source_file):
+					academic_year, semester, source_file, end_date):
 	"""Insert one Timetable doc for a resolved row on a specific week.
 
-	Returns doc.name if created, None if the entry already exists (duplicate).
+	Returns doc.name if created, None if the entry already exists (duplicate)
+	or if the generated date falls outside the semester range.
 	"""
 	actual_date = add_days(week_start_date, resolved["day_offset"])
-	activity_id = resolved["activity_id"]
+	if actual_date > end_date:
+		return None
 
-	if activity_id and frappe.db.exists("Timetable", {
-		"fet_activity_id": activity_id,
+	if resolved["activity_id"] and frappe.db.exists("Timetable", {
+		"fet_activity_id": resolved["activity_id"],
 		"date": actual_date,
 	}):
 		return None
@@ -336,7 +347,7 @@ def _create_entry(resolved, week_start_date, batch_id, imported_at_ts,
 		"student_groups":  resolved["student_groups"],
 		"academic_year":   academic_year or None,
 		"semester":        semester or None,
-		"fet_activity_id": activity_id or None,
+		"fet_activity_id": resolved["activity_id"] or None,
 		"import_batch":    batch_id,
 		"source_file":     source_file or None,
 		"imported_at":     imported_at_ts,
