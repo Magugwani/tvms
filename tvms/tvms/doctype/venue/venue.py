@@ -19,7 +19,58 @@ VENUE_VIEW_ROLES = {
 class Venue(Document):
 
 	# ---------------------------------------------------------------
-	# FR-60 / FR-61: Status computation
+	# Validation
+	# ---------------------------------------------------------------
+
+	def validate(self):
+		self._validate_coordinates()
+		self._validate_floor_number()
+		self._validate_capacity()
+
+	def _validate_coordinates(self):
+		"""FR-19: Coordinates must be a valid decimal degree pair when provided."""
+		if self.latitude and not (-90 <= float(self.latitude) <= 90):
+			frappe.throw(_("Latitude must be between -90 and 90 degrees"))
+		if self.longitude and not (-180 <= float(self.longitude) <= 180):
+			frappe.throw(_("Longitude must be between -180 and 180 degrees"))
+		if (self.latitude and not self.longitude) or (self.longitude and not self.latitude):
+			frappe.throw(_("Both Latitude and Longitude must be provided together"))
+
+	def _validate_floor_number(self):
+		"""Floor number must be a reasonable value (basements allowed as negatives)."""
+		if self.floor_number is not None and not (-10 <= int(self.floor_number) <= 200):
+			frappe.throw(_("Floor number seems invalid. Use 0 for ground floor, negative for basement."))
+
+	def _validate_capacity(self):
+		if self.capacity is not None and int(self.capacity) < 1:
+			frappe.throw(_("Capacity must be at least 1"))
+
+	# ---------------------------------------------------------------
+	# FR-11: Computed helpers
+	# ---------------------------------------------------------------
+
+	def get_floor_label(self):
+		"""Return human-readable floor label (Ground floor, 1st floor, Basement, etc.)."""
+		n = int(self.floor_number or 0)
+		if n == 0:
+			return "Ground floor"
+		if n < 0:
+			return f"Basement {abs(n)}" if abs(n) > 1 else "Basement"
+		suffixes = {1: "st", 2: "nd", 3: "rd"}
+		suffix = suffixes.get(n if n <= 3 else 0, "th")
+		return f"{n}{suffix} floor"
+
+	def get_coordinates(self):
+		"""Return (latitude, longitude) tuple or None if not set."""
+		if self.latitude and self.longitude:
+			return (float(self.latitude), float(self.longitude))
+		return None
+
+	def has_coordinates(self):
+		return bool(self.latitude and self.longitude)
+
+	# ---------------------------------------------------------------
+	# FR-60 / FR-61: Status computation (unchanged)
 	# ---------------------------------------------------------------
 
 	def compute_status(self, at_time=None):
@@ -64,9 +115,7 @@ class Venue(Document):
 		):
 			return "IN-USE"
 
-		# Emergency sessions reserve the venue as soon as they are created.
-		# PENDING sessions are still reservations because they block other
-		# scheduling attempts until cancelled, completed, or expired.
+		# PENDING sessions reserve the venue until cancelled / expired
 		if frappe.db.get_all(
 			"Emergency session",
 			filters=[
@@ -81,12 +130,35 @@ class Venue(Document):
 
 		return "FREE"
 
-	def refresh_status(self, at_time=None):
-		"""Recompute and persist current_status if it differs from the live value."""
+	def refresh_status(self, at_time=None, trigger=None, reference_type=None,
+					   reference_name=None, note=None):
+		"""Recompute and persist current_status if it differs from the live value.
+
+		When the status changes a Venue Status History row is appended (FR-14).
+
+		Args:
+		    at_time        -- datetime to evaluate at (defaults to now)
+		    trigger        -- what caused the change e.g. "Emergency Session Confirmed"
+		    reference_type -- DocType that triggered this e.g. "Emergency session"
+		    reference_name -- Document name e.g. "EMS-0001"
+		    note           -- optional free-text context
+		"""
 		new_status = self.compute_status(at_time)
 		if self.current_status != new_status:
+			old_status = self.current_status          # capture BEFORE overwriting
 			frappe.db.set_value("Venue", self.name, "current_status", new_status)
 			self.current_status = new_status
+			# FR-14: log every transition automatically
+			frappe.get_doc({
+				"doctype": "Venue Status History",
+				"venue": self.name,
+				"from_status": old_status,
+				"to_status": new_status,
+				"trigger": trigger or "Scheduler Sync",
+				"reference_type": reference_type,
+				"reference_name": reference_name,
+				"note": note,
+			}).insert(ignore_permissions=True)
 		return new_status
 
 	# ---------------------------------------------------------------
@@ -103,15 +175,9 @@ class Venue(Document):
 # ---------------------------------------------------------------
 
 def _is_venue_available(venue_name, start_time, end_time, exclude_session=None):
-	"""Check venue availability against Emergency sessions and Timetable.
-
-	PENDING + CONFIRMED emergency sessions are treated as reservations.
-	Sessions that are CANCELLED / COMPLETED / EXPIRED are ignored.
-	"""
 	start_dt = get_datetime(start_time)
 	end_dt = get_datetime(end_time)
 
-	# Emergency session overlap
 	ems_filters = [
 		["venue", "=", venue_name],
 		["status", "not in", ["CANCELLED", "COMPLETED", "EXPIRED"]],
@@ -124,7 +190,6 @@ def _is_venue_available(venue_name, start_time, end_time, exclude_session=None):
 	if frappe.db.get_all("Emergency session", filters=ems_filters, fields=["name"], limit=1):
 		return False
 
-	# Timetable overlap — date is a Date field, times are Time fields
 	at_date = start_dt.date()
 	start_time_str = start_dt.strftime("%H:%M:%S")
 	end_time_str = end_dt.strftime("%H:%M:%S")
@@ -147,11 +212,7 @@ def _is_venue_available(venue_name, start_time, end_time, exclude_session=None):
 
 
 def _blocked_venues(start_time, end_time):
-	"""Return the set of venue names with any booking conflict in [start_time, end_time).
-
-	Uses two bulk queries instead of per-venue checks so it scales with
-	the number of venues.
-	"""
+	"""Return the set of venue names with any booking conflict in [start_time, end_time)."""
 	start_dt = get_datetime(start_time)
 	end_dt = get_datetime(end_time)
 	at_date = start_dt.date()
@@ -181,8 +242,6 @@ def _blocked_venues(start_time, end_time):
 
 
 def _venue_has_resources(venue_resources, required):
-	"""True when every item in `required` (set of lowercase strings) is present
-	in the venue's comma-separated resources string."""
 	if not required:
 		return True
 	available = {r.strip().lower() for r in (venue_resources or "").split(",") if r.strip()}
@@ -194,7 +253,6 @@ def _format_datetime(value):
 
 
 def _ensure_venue_view_access():
-	"""Allow venue dashboard readers by role, with read permission as a fallback."""
 	user_roles = set(frappe.get_roles())
 	if user_roles.intersection(VENUE_VIEW_ROLES):
 		return
@@ -204,12 +262,6 @@ def _ensure_venue_view_access():
 
 
 def _get_venue_booking_windows(venue_name, at_time=None, limit=5):
-	"""Return current/upcoming bookings for a venue.
-
-	Emergency sessions show exact datetime windows. Timetable rows are expanded
-	to datetime-like strings for display so venue users can see general timetable
-	references beside emergency reservations.
-	"""
 	at = get_datetime(at_time) if at_time else now_datetime()
 	today = at.date()
 	now_time = at.strftime("%H:%M:%S")
@@ -287,15 +339,119 @@ def _get_venue_booking_windows(venue_name, at_time=None, limit=5):
 
 
 # ---------------------------------------------------------------
-# FR-62: Real-time availability API
+# FR-11: New — venue full detail API (includes all new fields)
+# ---------------------------------------------------------------
+
+@frappe.whitelist(methods=["GET"])
+def get_venue_detail(venue: str):
+	"""Return full venue details including all FR-11 fields and live status.
+
+	Used by Flutter app and Desk pages for venue info cards and navigation.
+	"""
+	_ensure_venue_view_access()
+
+	if not frappe.db.exists("Venue", venue):
+		frappe.throw(_("Venue not found: {0}").format(venue), frappe.DoesNotExistError)
+
+	doc = frappe.get_doc("Venue", venue)
+	live_status = doc.compute_status()
+
+	result = {
+		"name":                  doc.name,
+		"venue_name":            doc.venue_name,
+		"venue_code":            doc.name,
+		"venue_type":            doc.venue_type or "",
+		"building_name":         doc.building_name or "",
+		"floor_number":          doc.floor_number if doc.floor_number is not None else 0,
+		"floor_label":           doc.get_floor_label(),
+		"location":              doc.location or "",
+		"capacity":              doc.capacity or 0,
+		"resources":             doc.resources or "",
+		"accessibility_features": doc.accessibility_features or "",
+		"current_status":        live_status,
+		"has_coordinates":       doc.has_coordinates(),
+		"latitude":              float(doc.latitude) if doc.latitude else None,
+		"longitude":             float(doc.longitude) if doc.longitude else None,
+		"map_link":              doc.map_link or "",
+		"navigation_notes":      doc.navigation_notes or "",
+		"bookings":              _get_venue_booking_windows(venue, limit=5),
+	}
+	return result
+
+
+# ---------------------------------------------------------------
+# FR-19: New — venues with coordinates only (for map display)
+# ---------------------------------------------------------------
+
+@frappe.whitelist(methods=["GET"])
+def get_venues_for_map(search: str = None, status: str = None):
+	"""Return all venues that have GPS coordinates set.
+
+	Used by the Flutter map screen and the venue navigation page.
+	Only returns venues where both latitude and longitude are non-null.
+	"""
+	_ensure_venue_view_access()
+
+	filters = [
+		["latitude", "is", "set"],
+		["longitude", "is", "set"],
+	]
+	or_filters = []
+	if search:
+		or_filters = [
+			["venue_name", "like", f"%{search}%"],
+			["building_name", "like", f"%{search}%"],
+			["venue_code", "like", f"%{search}%"],
+			["location", "like", f"%{search}%"],
+		]
+	if status:
+		filters.append(["current_status", "=", status])
+
+	rows = frappe.db.get_all(
+		"Venue",
+		filters=filters,
+		or_filters=or_filters if or_filters else None,
+		fields=[
+			"name", "venue_name", "venue_type", "building_name",
+			"floor_number", "location", "capacity", "resources",
+			"accessibility_features", "current_status",
+			"latitude", "longitude", "map_link", "navigation_notes",
+		],
+		order_by="building_name asc, venue_name asc",
+	)
+
+	result = []
+	for row in rows:
+		if not row.get("latitude") or not row.get("longitude"):
+			continue
+		result.append({
+			**{k: (row[k] or "") for k in row if k not in ("latitude", "longitude", "floor_number")},
+			"latitude":     float(row["latitude"]),
+			"longitude":    float(row["longitude"]),
+			"floor_number": int(row["floor_number"] or 0),
+			"floor_label":  _floor_label(int(row["floor_number"] or 0)),
+		})
+
+	return result
+
+
+def _floor_label(n):
+	if n == 0:
+		return "Ground floor"
+	if n < 0:
+		return f"Basement {abs(n)}" if abs(n) > 1 else "Basement"
+	suffixes = {1: "st", 2: "nd", 3: "rd"}
+	suffix = suffixes.get(n if n <= 3 else 0, "th")
+	return f"{n}{suffix} floor"
+
+
+# ---------------------------------------------------------------
+# Existing APIs (unchanged — kept for compatibility)
 # ---------------------------------------------------------------
 
 @frappe.whitelist(methods=["GET", "POST"])
 def get_all_venues(search: str = None):
-	"""Return all venues with full details including live status.
-
-	Used by Desk pages and whitelisted integrations.
-	"""
+	"""Return all venues with full details including live status."""
 	_ensure_venue_view_access()
 
 	filters = []
@@ -305,28 +461,32 @@ def get_all_venues(search: str = None):
 			["venue_name", "like", f"%{search}%"],
 			["venue_code", "like", f"%{search}%"],
 			["location", "like", f"%{search}%"],
+			["building_name", "like", f"%{search}%"],
 		]
 
 	rows = frappe.db.get_all(
 		"Venue",
 		filters=filters,
-		or_filters=or_filters,
-		fields=["name", "venue_name", "venue_code", "location", "capacity", "resources", "current_status"],
-		order_by="venue_name asc",
+		or_filters=or_filters if or_filters else None,
+		fields=[
+			"name", "venue_name", "venue_code", "venue_type",
+			"building_name", "floor_number", "location",
+			"capacity", "resources", "accessibility_features",
+			"current_status", "latitude", "longitude",
+		],
+		order_by="building_name asc, venue_name asc",
 	)
 	for row in rows:
 		row["bookings"] = _get_venue_booking_windows(row.name, limit=3)
 		row["next_booking"] = row["bookings"][0] if row["bookings"] else None
+		row["floor_label"] = _floor_label(int(row.get("floor_number") or 0))
+		row["has_coordinates"] = bool(row.get("latitude") and row.get("longitude"))
 	return rows
 
 
 @frappe.whitelist(methods=["GET", "POST"])
 def get_all_venue_statuses():
-	"""Return the stored current_status for every venue.
-
-	Used by Desk pages for the initial venue status snapshot.
-	Subsequent updates arrive via the venue_status_update WebSocket event.
-	"""
+	"""Return the stored current_status for every venue (dict keyed by venue name)."""
 	_ensure_venue_view_access()
 
 	rows = frappe.db.get_all(
@@ -334,34 +494,39 @@ def get_all_venue_statuses():
 		fields=["name", "venue_name", "current_status"],
 		order_by="name asc",
 	)
-	# Return as a dict keyed by venue name for O(1) lookups in Desk page scripts.
 	return {r["name"]: r["current_status"] or "FREE" for r in rows}
+
 
 @frappe.whitelist(methods=["GET", "POST"])
 def get_venue_status(venue: str, at_time: str = None):
-	"""Return the live status of a single venue.
-
-	Params:
-	  venue    — Venue name (venue_code)
-	  at_time  — ISO datetime; defaults to now
-	"""
+	"""Return the live status of a single venue."""
 	_ensure_venue_view_access()
 
 	if not frappe.db.exists("Venue", venue):
 		frappe.throw(_("Venue not found: {0}").format(venue), frappe.DoesNotExistError)
 
 	doc = frappe.get_doc("Venue", venue)
-	live_status = doc.compute_status(at_time)
+	live_status = doc.compute_status(at_time) #live status is computed on the fly, not stored in DB
 
 	return {
-		"venue": venue,
-		"venue_name": doc.venue_name,
-		"capacity": doc.capacity,
-		"resources": doc.resources,
-		"live_status": live_status,
-		"stored_status": doc.current_status,
-		"in_sync": live_status == doc.current_status,
-		"bookings": _get_venue_booking_windows(venue, at_time=at_time),
+		"venue":          venue,
+		"venue_name":     doc.venue_name,
+		"capacity":       doc.capacity,
+		"resources":      doc.resources,
+		"building_name":  doc.building_name or "",
+		"floor_number":   doc.floor_number if doc.floor_number is not None else 0,
+		"floor_label":    doc.get_floor_label(),
+		"location":       doc.location or "",
+		"current_status": live_status,
+		"map_link":	   doc.map_link or "",
+		"navigation_notes": doc.navigation_notes or "",
+		"live_status":    live_status,
+		"stored_status":  doc.current_status,
+		"in_sync":        live_status == doc.current_status,
+		"has_coordinates": doc.has_coordinates(),
+		"latitude":       float(doc.latitude) if doc.latitude else None,
+		"longitude":      float(doc.longitude) if doc.longitude else None,
+		"bookings":       _get_venue_booking_windows(venue, at_time=at_time),
 	}
 
 
@@ -391,13 +556,7 @@ def get_venue_dashboard(search: str = None, status: str = None, date: str = None
 
 @frappe.whitelist(methods=["GET", "POST"])
 def get_available_venues(start_time: str, end_time: str, expected_students: int = None):
-	"""FR-62: Return all venues with no conflict in [start_time, end_time).
-
-	Params:
-	  start_time       — ISO datetime
-	  end_time         — ISO datetime
-	  expected_students — optional minimum capacity filter
-	"""
+	"""Return all venues with no conflict in [start_time, end_time)."""
 	if not start_time or not end_time:
 		frappe.throw(_("start_time and end_time are required"))
 
@@ -408,18 +567,21 @@ def get_available_venues(start_time: str, end_time: str, expected_students: int 
 	all_venues = frappe.db.get_all(
 		"Venue",
 		filters=filters,
-		fields=["name", "venue_name", "capacity", "resources", "current_status"],
+		fields=[
+			"name", "venue_name", "venue_type", "building_name",
+			"floor_number", "capacity", "resources", "current_status",
+			"latitude", "longitude",
+		],
 		order_by="capacity asc",
 	)
 
 	blocked = _blocked_venues(start_time, end_time)
+	available = [v for v in all_venues if v["name"] not in blocked]
+	for v in available:
+		v["floor_label"] = _floor_label(int(v.get("floor_number") or 0))
+		v["has_coordinates"] = bool(v.get("latitude") and v.get("longitude"))
+	return available
 
-	return [v for v in all_venues if v["name"] not in blocked]
-
-
-# ---------------------------------------------------------------
-# FR-63: Smart venue recommendation
-# ---------------------------------------------------------------
 
 @frappe.whitelist(methods=["GET", "POST"])
 def recommend_venue(
@@ -428,31 +590,155 @@ def recommend_venue(
 	end_time: str,
 	required_resources: str = None,
 ):
-	"""Suggest the best-fit venue for a session.
-
-	Selection criteria (in order):
-	  1. capacity >= expected_students
-	  2. all required_resources present (comma-separated)
-	  3. no booking conflict in [start_time, end_time)
-	  4. sorted by capacity ascending — smallest venue that fits wins
-	"""
+	"""Suggest best-fit venue: capacity ≥ students, resources match, no conflict, smallest fit first."""
 	if not expected_students or not start_time or not end_time:
 		frappe.throw(_("expected_students, start_time, and end_time are required"))
 
 	candidates = frappe.db.get_all(
 		"Venue",
 		filters=[["capacity", ">=", int(expected_students)]],
-		fields=["name", "venue_name", "capacity", "resources"],
+		fields=[
+			"name", "venue_name", "venue_type", "building_name",
+			"floor_number", "capacity", "resources",
+			"latitude", "longitude",
+		],
 		order_by="capacity asc",
 	)
 
-	# Resource filter
 	if required_resources:
 		needed = {r.strip().lower() for r in required_resources.split(",") if r.strip()}
 		candidates = [v for v in candidates if _venue_has_resources(v.get("resources"), needed)]
 
-	# Availability filter — one bulk query, no per-venue DB hits
 	blocked = _blocked_venues(start_time, end_time)
 	available = [v for v in candidates if v["name"] not in blocked]
-
+	for v in available:
+		v["floor_label"] = _floor_label(int(v.get("floor_number") or 0))
+		v["has_coordinates"] = bool(v.get("latitude") and v.get("longitude"))
 	return available
+
+#        get_venue_status_history():
+#          - Whitelisted GET API
+#          - Returns the history for one venue, newest first
+#          - Enriches triggered_by with the user's full name
+#          - Used by Flutter app timeline and future analytics
+# =============================================================
+
+def log_venue_status_change(
+	venue,
+	to_status,
+	from_status=None,
+	trigger=None,
+	reference_type=None,
+	reference_name=None,
+	note=None,
+):
+	"""Append one row to the Venue Status History child table (FR-14).
+
+	Trigger labels (use exactly these strings for consistency):
+	    "Emergency Session Confirmed"
+	    "Emergency Session Cancelled"
+	    "Emergency Session Completed"
+	    "Emergency Session Expired"
+	    "Emergency Session Created"
+	    "Timetable Session Active"
+	    "Timetable Session Ended"
+	    "Scheduler Sync"
+	    "Manual"
+
+	Args:
+	    venue          -- Venue document name (venue_code)
+	    to_status      -- new status value: FREE / BOOKED / IN-USE / EXPIRED
+	    from_status    -- previous status value (None on first log)
+	    trigger        -- cause label from the list above
+	    reference_type -- DocType e.g. "Emergency session", "Timetable", "Scheduler"
+	    reference_name -- document name e.g. "EMS-0001"
+	    note           -- optional free-text context
+	"""
+	try:
+		frappe.db.sql("""
+			INSERT INTO `tabVenue Status History`
+			    (name, parent, parenttype, parentfield,
+			     timestamp, from_status, to_status,
+			     `trigger`, triggered_by,
+			     reference_type, reference_name, note)
+			VALUES
+			    (%(name)s, %(parent)s, 'Venue', 'status_history',
+			     %(timestamp)s, %(from_status)s, %(to_status)s,
+			     %(trigger)s, %(triggered_by)s,
+			     %(reference_type)s, %(reference_name)s, %(note)s)
+		""", {
+			"name":           frappe.generate_hash(length=10),
+			"parent":         venue,
+			"timestamp":      now_datetime(),
+			"from_status":    from_status or "",
+			"to_status":      to_status,
+			"trigger":        trigger or "Scheduler Sync",
+			"triggered_by":   frappe.session.user if frappe.session else "System",
+			"reference_type": reference_type or "",
+			"reference_name": reference_name or "",
+			"note":           note or "",
+		})
+		frappe.db.commit()
+	except Exception:
+		# History logging must NEVER break the main session flow
+		frappe.logger().warning(
+			f"[TVMS] Failed to log status history for venue {venue}",
+			exc_info=True,
+		)
+
+
+@frappe.whitelist(methods=["GET"])
+def get_venue_status_history(venue: str, limit: int = 50):
+	"""Return status change history for a venue, newest first (FR-14).
+
+	Args:
+	    venue -- Venue document name (venue_code)
+	    limit -- max rows to return (default 50, hard max 500)
+
+	Returns dict:
+	    venue   -- venue name
+	    total   -- total number of history rows (for pagination)
+	    history -- list of rows, each with timestamp, from_status, to_status,
+	               trigger, triggered_by, triggered_by_name, reference_type,
+	               reference_name, note
+	"""
+	_ensure_venue_view_access()
+
+	if not frappe.db.exists("Venue", venue):
+		frappe.throw(_("Venue not found: {0}").format(venue), frappe.DoesNotExistError)
+
+	limit = min(int(limit or 50), 500)
+
+	rows = frappe.db.sql("""
+		SELECT
+		    timestamp,
+		    from_status,
+		    to_status,
+		    `trigger`,
+		    triggered_by,
+		    reference_type,
+		    reference_name,
+		    note
+		FROM `tabVenue Status History`
+		WHERE parent     = %(venue)s
+		  AND parenttype = 'Venue'
+		ORDER BY timestamp DESC
+		LIMIT %(limit)s
+	""", {"venue": venue, "limit": limit}, as_dict=True)
+
+	# Batch-resolve triggered_by emails → full names (one query, not N)
+	user_names = {}
+	for row in rows:
+		user = row.get("triggered_by")
+		if user and user not in user_names:
+			user_names[user] = frappe.db.get_value("User", user, "full_name") or user
+
+	for row in rows:
+		row["triggered_by_name"] = user_names.get(row.get("triggered_by"), "")
+		row["timestamp"] = str(row["timestamp"])[:16] if row.get("timestamp") else ""
+
+	return {
+		"venue":   venue,
+		"total":   frappe.db.count("Venue Status History", {"parent": venue}),
+		"history": rows,
+	}

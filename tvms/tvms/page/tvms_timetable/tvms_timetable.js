@@ -34,6 +34,11 @@ class TVMSStaticTimetable {
 	build() {
 		this.page.set_primary_action(__("Refresh"), () => this.load(), "refresh");
 		this.page.add_inner_button(__("Timetable List"), () => frappe.set_route("List", "Timetable"));
+		this.page.add_inner_button(__("By Program & Year"), () => frappe.set_route("tvms-program-timetable"));
+
+		if (frappe.user.has_role(["Department Admin", "System Manager", "Administrator"])) {
+			this.page.set_secondary_action(__("Add Class"), () => this._open_add_class_dialog(), "add");
+		}
 
 		this.$body = $(`
 			<div class="tvms-timetable-page">
@@ -322,8 +327,16 @@ class TVMSStaticTimetable {
 		});
 
 		this.$body.find(".tvms-grid").css("grid-template-columns", `110px repeat(${columns - 1}, minmax(165px, 1fr))`).html(html.join(""));
+
+		const is_admin = frappe.user.has_role(["Department Admin", "System Manager", "Administrator"]);
+		const self = this;
 		this.$body.find(".tvms-session-card").on("click", function () {
-			frappe.set_route("Form", "Timetable", $(this).data("name"));
+			const name = $(this).data("name");
+			if (is_admin) {
+				self._open_edit_class_dialog(name);
+			} else {
+				frappe.set_route("Form", "Timetable", name);
+			}
 		});
 	}
 
@@ -402,5 +415,181 @@ class TVMSStaticTimetable {
 	time_label(start, end) {
 		const clean = (value) => String(value || "").slice(0, 5);
 		return end ? `${clean(start)} - ${clean(end)}` : clean(start);
+	}
+
+	// ------------------------------------------------------------------
+	// FR-1: Add Class — direct creation, no FET CSV required
+	// ------------------------------------------------------------------
+
+	_class_fields(defaults = {}) {
+		return [
+			{
+				fieldname: "course", fieldtype: "Link", options: "Course",
+				label: __("Course"), reqd: 1, default: defaults.course,
+			},
+			{ fieldtype: "Column Break" },
+			{
+				fieldname: "venue", fieldtype: "Link", options: "Venue",
+				label: __("Venue"), default: defaults.venue,
+			},
+			{
+				fieldname: "lecturer", fieldtype: "Link", options: "User",
+				label: __("Lecturer"), default: defaults.lecturer,
+			},
+			{ fieldtype: "Section Break" },
+			{
+				fieldname: "date", fieldtype: "Date",
+				label: __("Date"), reqd: 1, default: defaults.date || frappe.datetime.get_today(),
+			},
+			{ fieldtype: "Column Break" },
+			{
+				fieldname: "start_time", fieldtype: "Time",
+				label: __("Start Time"), reqd: 1, default: defaults.start_time,
+			},
+			{
+				fieldname: "end_time", fieldtype: "Time",
+				label: __("End Time"), reqd: 1, default: defaults.end_time,
+			},
+			{ fieldtype: "Section Break" },
+			{
+				fieldname: "program", fieldtype: "Data",
+				label: __("Program"), default: defaults.program,
+			},
+			{ fieldtype: "Column Break" },
+			{
+				fieldname: "department", fieldtype: "Data",
+				label: __("Department"), default: defaults.department,
+			},
+			{ fieldtype: "Section Break" },
+			{
+				fieldname: "academic_year", fieldtype: "Data",
+				label: __("Academic Year"), default: defaults.academic_year,
+				placeholder: "e.g. 2026/2027",
+			},
+			{ fieldtype: "Column Break" },
+			{
+				fieldname: "semester", fieldtype: "Select",
+				label: __("Semester"), default: defaults.semester,
+				options: "\nSemester 1\nSemester 2\nTrimester 1\nTrimester 2\nTrimester 3",
+			},
+			{ fieldtype: "Section Break" },
+			{
+				fieldname: "year_level", fieldtype: "Data",
+				label: __("Year Level"), default: defaults.year_level,
+			},
+			{ fieldtype: "Column Break" },
+			{
+				fieldname: "students_groups", fieldtype: "Data",
+				label: __("Student Group(s)"), default: defaults.students_groups,
+			},
+		];
+	}
+
+	_open_add_class_dialog() {
+		const self = this;
+		const fields = this._class_fields({ date: this.week_start });
+
+		fields.push(
+			{ fieldtype: "Section Break", label: __("Repeat") },
+			{
+				fieldname: "repeat_weekly_until", fieldtype: "Date",
+				label: __("Repeat weekly until"),
+				description: __(
+					"Optional. Creates the same class every week on the same weekday, " +
+					"up to and including this date — no CSV needed."
+				),
+			},
+		);
+
+		const d = new frappe.ui.Dialog({
+			title: __("Add Class to Timetable"),
+			fields,
+			primary_action_label: __("Create"),
+			primary_action: async (values) => {
+				d.set_primary_action(__("Creating..."), null);
+				try {
+					const r = await frappe.xcall(
+						"tvms.tvms.doctype.timetable.timetable.create_timetable_entry",
+						values,
+					);
+					frappe.show_alert({
+						message: __("Created {0} timetable entr{1}", [
+							r.count, r.count === 1 ? "y" : "ies",
+						]),
+						indicator: "green",
+					});
+					d.hide();
+					self.load();
+				} catch (e) {
+					d.set_primary_action(__("Create"), () => d.get_primary_btn().trigger("click"));
+				}
+			},
+		});
+
+		d.show();
+	}
+
+	// ------------------------------------------------------------------
+	// FR-2 / FR-3: Edit and delete an existing class directly from the grid
+	// ------------------------------------------------------------------
+
+	async _open_edit_class_dialog(name) {
+		const self = this;
+		let entry;
+		try {
+			entry = await frappe.xcall(
+				"tvms.tvms.doctype.timetable.timetable.get_timetable_entry",
+				{ name },
+			);
+		} catch (e) {
+			return;
+		}
+
+		const fields = this._class_fields(entry);
+		fields.push(
+			{ fieldtype: "Section Break" },
+			{
+				fieldname: "status", fieldtype: "Select",
+				label: __("Status"), default: entry.status,
+				options: "SCHEDULED\nCOMPLETED",
+			},
+		);
+
+		const d = new frappe.ui.Dialog({
+			title: __("Edit Class") + ` — ${name}`,
+			fields,
+			primary_action_label: __("Save"),
+			primary_action: async (values) => {
+				d.set_primary_action(__("Saving..."), null);
+				try {
+					await frappe.xcall(
+						"tvms.tvms.doctype.timetable.timetable.update_timetable_entry",
+						{ name, ...values },
+					);
+					frappe.show_alert({ message: __("Timetable entry updated"), indicator: "green" });
+					d.hide();
+					self.load();
+				} catch (e) {
+					d.set_primary_action(__("Save"), () => d.get_primary_btn().trigger("click"));
+				}
+			},
+			secondary_action_label: __("Delete"),
+			secondary_action: () => {
+				frappe.confirm(
+					__("Delete this timetable entry? This cannot be undone."),
+					async () => {
+						await frappe.xcall(
+							"tvms.tvms.doctype.timetable.timetable.delete_timetable_entry",
+							{ name },
+						);
+						frappe.show_alert({ message: __("Timetable entry deleted"), indicator: "orange" });
+						d.hide();
+						self.load();
+					},
+				);
+			},
+		});
+
+		d.show();
 	}
 }

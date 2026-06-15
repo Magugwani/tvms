@@ -419,6 +419,277 @@ def _offset_time(time_str, hours):
 	t += timedelta(hours=hours)
 	return t.strftime("%H:%M:%S")
 
+# ---------------------------------------------------------------
+# Program/Year segmented timetable (one grid per "Program - Year")
+# ---------------------------------------------------------------
+
+def _program_year_label(program, year_level):
+	"""Build a display label like 'Bachelor's Degree in Information - First Year'."""
+	program = (program or "").strip()
+	year_level = (year_level or "").strip()
+	if program and year_level:
+		return f"{program} - {year_level}"
+	return program or year_level or "Unassigned"
+
+
+@frappe.whitelist(methods=["GET", "POST"])
+def get_program_timetable_groups(
+	week_start: str,
+	include_weekends: int = 0,
+	program: str = None,
+	year_level: str = None,
+):
+	"""Return the week's Timetable entries grouped by Program + Year Level.
+
+	Each group becomes one weekly grid section in the admin UI — e.g.
+	"Bachelor's Degree in Information - First Year" with its own
+	Monday-Saturday table, mirroring the layout of the FET export.
+
+	Args:
+	    week_start       -- Monday of the week (YYYY-MM-DD)
+	    include_weekends -- 1 to include Saturday/Sunday columns
+	    program          -- optional filter to a single program
+	    year_level       -- optional filter to a single year level
+
+	Returns:
+	    {
+	      "week_start": "...",
+	      "groups": [
+	        {
+	          "key": "Bachelor's Degree in Information||First Year",
+	          "label": "Bachelor's Degree in Information - First Year",
+	          "program": "Bachelor's Degree in Information",
+	          "year_level": "First Year",
+	          "sessions": [ ...same shape as get_week_timetable... ]
+	        },
+	        ...
+	      ]
+	    }
+	"""
+	frappe.has_permission("Timetable", "read", throw=True)
+
+	sessions = get_week_timetable(week_start, include_weekends=include_weekends)
+
+	groups = {}
+	for s in sessions:
+		s_program = s.get("program") or ""
+		s_year = s.get("year_level") or ""
+
+		if program and s_program != program:
+			continue
+		if year_level and s_year != year_level:
+			continue
+
+		key = f"{s_program}||{s_year}"
+		if key not in groups:
+			groups[key] = {
+				"key": key,
+				"label": _program_year_label(s_program, s_year),
+				"program": s_program,
+				"year_level": s_year,
+				"sessions": [],
+			}
+		groups[key]["sessions"].append(s)
+
+	# Sort groups: by program name, then by a sensible year ordering
+	year_order = {
+		"first year": 1, "1st year": 1, "year 1": 1, "year i": 1,
+		"second year": 2, "2nd year": 2, "year 2": 2, "year ii": 2,
+		"third year": 3, "3rd year": 3, "year 3": 3, "year iii": 3,
+		"fourth year": 4, "4th year": 4, "year 4": 4, "year iv": 4,
+		"fifth year": 5, "5th year": 5, "year 5": 5, "year v": 5,
+	}
+
+	def _sort_key(g):
+		return (
+			g["program"].lower(),
+			year_order.get(g["year_level"].lower(), 99),
+			g["year_level"].lower(),
+		)
+
+	sorted_groups = sorted(groups.values(), key=_sort_key)
+
+	return {"week_start": week_start, "groups": sorted_groups}
+
+
+@frappe.whitelist(methods=["GET", "POST"])
+def get_program_year_options():
+	"""Return distinct (program, year_level) combinations for filter dropdowns
+	and for pre-filling the "Add Class" dialog with a specific segment.
+	"""
+	frappe.has_permission("Timetable", "read", throw=True)
+
+	rows = frappe.db.get_all(
+		"Timetable",
+		fields=["program", "year_level"],
+		distinct=True,
+	)
+
+	programs = sorted({r["program"] for r in rows if r.get("program")})
+	year_levels = sorted({r["year_level"] for r in rows if r.get("year_level")})
+
+	groups = sorted(
+		{(r.get("program") or "", r.get("year_level") or "") for r in rows
+		 if r.get("program") or r.get("year_level")}
+	)
+
+	return {
+		"programs": programs,
+		"year_levels": year_levels,
+		"groups": [
+			{"program": p, "year_level": y, "label": _program_year_label(p, y)}
+			for p, y in groups
+		],
+	}
+
+
+# ---------------------------------------------------------------
+# Program-wise grouped timetable (for the segmented admin grid UI)
+# ---------------------------------------------------------------
+
+_YEAR_LEVEL_LABELS = {
+	"1": "First Year", "i": "First Year", "year 1": "First Year", "first year": "First Year",
+	"2": "Second Year", "ii": "Second Year", "year 2": "Second Year", "second year": "Second Year",
+	"3": "Third Year", "iii": "Third Year", "year 3": "Third Year", "third year": "Third Year",
+	"4": "Fourth Year", "iv": "Fourth Year", "year 4": "Fourth Year", "fourth year": "Fourth Year",
+	"5": "Fifth Year", "v": "Fifth Year", "year 5": "Fifth Year", "fifth year": "Fifth Year",
+}
+
+
+def _year_level_label(value):
+	"""Normalise year_level into a display label e.g. '1' -> 'First Year'."""
+	if not value:
+		return ""
+	key = str(value).strip().lower()
+	return _YEAR_LEVEL_LABELS.get(key, str(value).strip())
+
+
+@frappe.whitelist(methods=["GET", "POST"])
+def get_week_timetable_grouped(
+	week_start: str,
+	lecturer: str = None,
+	venue: str = None,
+	course: str = None,
+	program: str = None,
+	year_level: str = None,
+	semester: str = None,
+	academic_year: str = None,
+	include_weekends: int = 0,
+):
+	"""Return the week's Timetable entries grouped by Program + Year Level.
+
+	Used by the segmented admin grid: each group renders as its own
+	mini-timetable (e.g. "Information Technology — First Year"), matching
+	the layout of program-wise paper/Excel timetables.
+
+	Returns:
+	    {
+	      "groups": [
+	          {
+	              "program": "Information Technology",
+	              "year_level": "1",
+	              "year_level_label": "First Year",
+	              "label": "Information Technology — First Year",
+	              "sessions": [ ...same shape as get_week_timetable... ]
+	          },
+	          ...
+	      ],
+	      "week_start": "...",
+	      "week_end": "...",
+	  }
+
+	Groups are sorted alphabetically by program, then by year_level.
+	Sessions with no program/year_level are grouped under "Unassigned".
+	"""
+	sessions = get_week_timetable(
+		week_start=week_start,
+		lecturer=lecturer,
+		venue=venue,
+		course=course,
+		program=program,
+		semester=semester,
+		academic_year=academic_year,
+		include_weekends=include_weekends,
+	)
+
+	if year_level:
+		target_label = _year_level_label(year_level)
+		sessions = [
+			s for s in sessions
+			if _year_level_label(s.get("year_level")) == target_label
+		]
+
+	groups_map = {}
+	for s in sessions:
+		prog = (s.get("program") or "").strip() or "Unassigned"
+		yl_raw = s.get("year_level") or ""
+		yl_label = _year_level_label(yl_raw) or "Unassigned"
+		key = (prog, yl_label)
+		if key not in groups_map:
+			groups_map[key] = {
+				"program": prog,
+				"year_level": yl_raw,
+				"year_level_label": yl_label,
+				"label": f"{prog} — {yl_label}" if yl_label != "Unassigned" else prog,
+				"sessions": [],
+			}
+		groups_map[key]["sessions"].append(s)
+
+	# Sort: named programs first (alphabetical), "Unassigned" last
+	def sort_key(group):
+		is_unassigned = group["program"] == "Unassigned"
+		return (is_unassigned, group["program"], group["year_level_label"])
+
+	groups = sorted(groups_map.values(), key=sort_key)
+
+	week_days = 7 if int(include_weekends or 0) else 5
+	week_end = str(add_days(getdate(week_start), week_days - 1))
+
+	return {
+		"groups": groups,
+		"week_start": week_start,
+		"week_end": week_end,
+		"total_sessions": len(sessions),
+		"total_groups": len(groups),
+	}
+
+
+@frappe.whitelist(methods=["GET", "POST"])
+def get_program_year_options():
+	"""Return distinct (program, year_level) combinations across all Timetable entries.
+
+	Used to populate the Program / Year Level filters and the "Add Class" dialog
+	defaults, and to let the admin jump straight to a specific program's section.
+	"""
+	frappe.has_permission("Timetable", "read", throw=True)
+
+	rows = frappe.db.get_all(
+		"Timetable",
+		filters=[["program", "is", "set"]],
+		fields=["program", "year_level"],
+		distinct=True,
+	)
+
+	combos = {}
+	for r in rows:
+		prog = (r.get("program") or "").strip()
+		if not prog:
+			continue
+		yl_raw = r.get("year_level") or ""
+		yl_label = _year_level_label(yl_raw) or "Unassigned"
+		combos[(prog, yl_label)] = yl_raw
+
+	result = []
+	for (prog, yl_label), yl_raw in combos.items():
+		result.append({
+			"program": prog,
+			"year_level": yl_raw,
+			"year_level_label": yl_label,
+			"label": f"{prog} — {yl_label}" if yl_label != "Unassigned" else prog,
+		})
+
+	result.sort(key=lambda x: (x["program"], x["year_level_label"]))
+	return result
 
 # ==================================================================
 # Link resolution helpers

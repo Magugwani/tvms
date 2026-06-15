@@ -105,6 +105,12 @@
    "label": "Enable Email Notifications"
   },
   {
+  "fieldname": "mapbox_token",
+  "fieldtype": "Password",
+  "label": "Mapbox Public Token",
+  "description": "Starts with pk.eyJ1... — get it from account.mapbox.com"
+},
+  {
    "description": "Default email address for sending notifications",
    "fieldname": "email_from",
    "fieldtype": "Data",
