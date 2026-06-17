@@ -13,13 +13,14 @@
   "course",
   "lecturer",
   "venue",
+  "status",
   "column_break_xdxr",
   "date",
   "day_of_week",
   "start_time",
   "end_time",
   "duration_hours",
-  "status",
+  "publish_status",
   "academic_context_section",
   "academic_year",
   "semester",
@@ -105,8 +106,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "SCHEDULED\nCOMPLETED",
-   "read_only": 1
+   "options": "SCHEDULED\nCOMPLETED"
   },
   {
    "fieldname": "academic_context_section",
@@ -168,13 +168,16 @@
   },
   {
    "fieldname": "department",
-   "fieldtype": "Data",
-   "label": "Department"
+   "fieldtype": "Link",
+   "label": "Department",
+   "options": "Departments"
   },
   {
    "fieldname": "program",
-   "fieldtype": "Data",
-   "label": "Program"
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Program",
+   "options": "Program"
   },
   {
    "fieldname": "column_break_ebhb",
@@ -182,8 +185,10 @@
   },
   {
    "fieldname": "year_level",
-   "fieldtype": "Data",
-   "label": "Year Level"
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Year Level",
+   "options": "First Year (1)\nSecond Year (2)\nThird Year (3)\nFourth Yea r(4)\nFifth Year (5)"
   },
   {
    "description": "FET Students Set(s) \u2014 e.g. CS-Y1-G1, CS-Y1-G2",
@@ -191,12 +196,20 @@
    "fieldtype": "Data",
    "label": "Students Groups",
    "unique": 1
+  },
+  {
+   "default": "DRAFT",
+   "fieldname": "publish_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Publish status",
+   "options": "DRAFT\nPUBLISHED"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-11 09:27:47.905591",
+ "modified": "2026-06-16 20:26:58.702024",
  "modified_by": "Administrator",
  "module": "tvms",
  "name": "Timetable",

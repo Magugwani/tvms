@@ -36,6 +36,8 @@ class TVMSProgramTimetable {
 
 		if (this.is_admin) {
 			this.page.set_secondary_action(__("Add Class"), () => this._open_add_class_dialog(), "add");
+			this.page.add_inner_button(__("Publish Timetable"), () => this._open_publish_dialog());
+			this.page.add_inner_button(__("Unpublish (back to draft)"), () => this._open_unpublish_dialog());
 		}
 
 		this.inject_styles();
@@ -55,6 +57,7 @@ class TVMSProgramTimetable {
 					</div>
 				</div>
 				<div class="tvms-pt-summary"></div>
+				<div class="tvms-pt-publish-summary"></div>
 				<div class="tvms-pt-groups"></div>
 			</div>
 		`).appendTo(this.page.main);
@@ -149,6 +152,38 @@ class TVMSProgramTimetable {
 			.tvms-pt-add-row-btn {
 				font-size: 11px; padding: 1px 8px; border-radius: 4px;
 			}
+			.tvms-pt-publish-banner {
+				display: flex; align-items: center; justify-content: space-between;
+				gap: 12px; padding: 10px 14px; border-radius: var(--border-radius-md, 6px);
+				background: var(--alert-bg-warning, rgba(255, 193, 7, 0.1));
+				border: 1px solid var(--alert-border-warning, rgba(255, 193, 7, 0.4));
+				margin-bottom: 14px; font-size: 13px;
+			}
+			.tvms-pt-publish-banner.all-published {
+				background: var(--alert-bg-success, rgba(40, 167, 69, 0.1));
+				border-color: var(--alert-border-success, rgba(40, 167, 69, 0.4));
+			}
+			.tvms-pt-publish-banner-body { display: flex; align-items: center; gap: 10px; }
+			.tvms-pt-publish-counts { font-weight: 500; }
+			.tvms-pt-publish-counts .pt-count-draft { color: var(--text-warning, #997404); }
+			.tvms-pt-publish-counts .pt-count-pub { color: var(--text-success, #156430); }
+			.tvms-pt-publish-banner-actions { display: flex; gap: 6px; }
+			.tvms-pt-publish-status {
+				display: inline-flex; align-items: center; gap: 4px;
+				font-size: 9px; font-weight: 600; text-transform: uppercase;
+				letter-spacing: 0.04em; padding: 1px 5px; border-radius: 3px;
+				margin-left: 4px; vertical-align: 1px;
+			}
+			.tvms-pt-publish-status.draft {
+				background: rgba(255, 193, 7, 0.15); color: var(--text-warning, #997404);
+			}
+			.tvms-pt-publish-status.published {
+				background: rgba(40, 167, 69, 0.15); color: var(--text-success, #156430);
+			}
+			.tvms-pt-card.is-draft {
+				border-style: dashed;
+				opacity: 0.85;
+			}
 		</style>`).appendTo("head");
 	}
 
@@ -159,12 +194,71 @@ class TVMSProgramTimetable {
 	async load() {
 		this.$body.find(".tvms-pt-groups").html(`<div class="tvms-pt-empty">${__("Loading...")}</div>`);
 
-		const data = await frappe.xcall(
-			"tvms.tvms.doctype.timetable.timetable.get_program_timetable_groups",
-			{ week_start: this.week_start, include_weekends: this.include_weekends },
-		);
+		// Admins see every entry (DRAFT + PUBLISHED) via the legacy API.
+		// Non-admins see only PUBLISHED entries via the new official API.
+		const method = this.is_admin
+			? "tvms.tvms.doctype.timetable.timetable.get_program_timetable_groups"
+			: "tvms.tvms.doctype.timetable.timetable.get_published_week_timetable";
+
+		const args = this.is_admin
+			? { week_start: this.week_start, include_weekends: this.include_weekends }
+			: { week_start: this.week_start };
+
+		const data = await frappe.xcall(method, args);
+
+		// Refresh publish status banner (admins only)
+		if (this.is_admin) {
+			this._refresh_publish_banner();
+		}
 
 		this.render(data);
+	}
+
+	async _refresh_publish_banner() {
+		try {
+			const summary = await frappe.xcall(
+				"tvms.tvms.doctype.timetable.timetable.get_publish_status_summary"
+			);
+			this._render_publish_banner(summary);
+		} catch (e) {
+			// If the API isn't deployed yet, hide the banner silently
+			this.$body.find(".tvms-pt-publish-summary").empty();
+		}
+	}
+
+	_render_publish_banner(summary) {
+		const $banner = this.$body.find(".tvms-pt-publish-summary");
+		const total = summary.total || 0;
+		const draft = summary.draft || 0;
+		const published = summary.published || 0;
+
+		if (!total) {
+			$banner.empty();
+			return;
+		}
+
+		const all_published = draft === 0 && published > 0;
+		const cls = all_published ? "all-published" : "";
+		const message = all_published
+			? __("All timetable entries are published as official.")
+			: __("{0} draft entry(ies) not yet published.", [draft]);
+
+		$banner.html(`
+			<div class="tvms-pt-publish-banner ${cls}">
+				<div class="tvms-pt-publish-banner-body">
+					<span>${message}</span>
+					<span class="tvms-pt-publish-counts">
+						<span class="pt-count-draft">${draft} ${__("draft")}</span> ·
+						<span class="pt-count-pub">${published} ${__("published")}</span>
+					</span>
+				</div>
+				<div class="tvms-pt-publish-banner-actions">
+					${draft > 0 ? `<button class="btn btn-primary btn-xs" data-action="publish-all">${__("Publish All")}</button>` : ""}
+				</div>
+			</div>
+		`);
+
+		$banner.find('[data-action="publish-all"]').on("click", () => this._open_publish_dialog());
 	}
 
 	render(data) {
@@ -267,9 +361,24 @@ class TVMSProgramTimetable {
 	card(session) {
 		const status_class = session.venue_status === "IN-USE" ? "in-use"
 			: session.venue_status === "BOOKED" ? "booked" : "";
+
+		// Show publish badge to admins so they can see at a glance which entries
+		// are still drafts vs published as official.
+		const pub = (session.publish_status || "").toUpperCase();
+		const is_draft = pub === "DRAFT";
+		const badge = this.is_admin && pub
+			? `<span class="tvms-pt-publish-status ${is_draft ? "draft" : "published"}">${
+				is_draft ? __("Draft") : __("Live")
+			}</span>`
+			: "";
+		const draft_cls = this.is_admin && is_draft ? " is-draft" : "";
+
 		return `
-			<div class="tvms-pt-card" data-name="${frappe.utils.escape_html(session.name)}">
-				<div class="tvms-pt-card-title">${frappe.utils.escape_html(session.course_name || session.course || __("Untitled"))}</div>
+			<div class="tvms-pt-card${draft_cls}" data-name="${frappe.utils.escape_html(session.name)}">
+				<div class="tvms-pt-card-title">
+					${frappe.utils.escape_html(session.course_name || session.course || __("Untitled"))}
+					${badge}
+				</div>
 				<div class="tvms-pt-card-meta">
 					<span class="tvms-pt-status-dot ${status_class}"></span>
 					${frappe.utils.escape_html(session.venue_name || session.venue || __("No venue"))}
@@ -318,10 +427,68 @@ class TVMSProgramTimetable {
 	// ------------------------------------------------------------------
 
 	_class_fields(defaults = {}) {
+		const self = this;
 		return [
+			{ fieldtype: "Section Break", label: __("Program segment") },
+			{
+				fieldname: "program", fieldtype: "Link", options: "Program",
+				label: __("Program"), reqd: 1, default: defaults.program,
+				onchange: function () {
+					// When program changes, refresh course filter and year options
+					const program = this.get_value();
+					const year_field = this.layout.get_field("year_level");
+					const course_field = this.layout.get_field("course");
+					if (program && year_field) {
+						frappe.xcall(
+							"tvms.tvms.doctype.program.program.get_program_years",
+							{ program },
+						).then((years) => {
+							year_field.df.options = ["", ...years].join("\n");
+							year_field.refresh();
+						});
+					}
+					if (course_field) {
+						course_field.get_query = () => ({
+							filters: {
+								program: program || undefined,
+								status: "Active",
+							},
+						});
+					}
+				},
+			},
+			{ fieldtype: "Column Break" },
+			{
+				fieldname: "year_level", fieldtype: "Select",
+				label: __("Year Level"), reqd: 1, default: defaults.year_level,
+				options: "\n1\n2\n3\n4\n5\n6",
+				onchange: function () {
+					// When year changes, also re-narrow the course list
+					const program = this.layout.get_value("program");
+					const year = this.get_value();
+					const course_field = this.layout.get_field("course");
+					if (course_field) {
+						course_field.get_query = () => ({
+							filters: {
+								program: program || undefined,
+								year: year || undefined,
+								status: "Active",
+							},
+						});
+					}
+				},
+			},
+			{ fieldtype: "Section Break" },
 			{
 				fieldname: "course", fieldtype: "Link", options: "Course",
 				label: __("Course"), reqd: 1, default: defaults.course,
+				get_query: () => ({
+					filters: {
+						program: defaults.program || undefined,
+						year: defaults.year_level || undefined,
+						status: "Active",
+					},
+				}),
 			},
 			{ fieldtype: "Column Break" },
 			{
@@ -332,7 +499,7 @@ class TVMSProgramTimetable {
 				fieldname: "lecturer", fieldtype: "Link", options: "User",
 				label: __("Lecturer"), default: defaults.lecturer,
 			},
-			{ fieldtype: "Section Break" },
+			{ fieldtype: "Section Break", label: __("Schedule") },
 			{
 				fieldname: "date", fieldtype: "Date",
 				label: __("Date"), reqd: 1, default: defaults.date || frappe.datetime.get_today(),
@@ -346,21 +513,9 @@ class TVMSProgramTimetable {
 				fieldname: "end_time", fieldtype: "Time",
 				label: __("End Time"), reqd: 1, default: defaults.end_time,
 			},
-			{ fieldtype: "Section Break", label: __("Program segment") },
+			{ fieldtype: "Section Break", label: __("Department & students") },
 			{
-				fieldname: "program", fieldtype: "Data",
-				label: __("Program"), default: defaults.program,
-				description: __("Used to group this class under its program/year section, e.g. 'Bachelor's Degree in Information'"),
-			},
-			{ fieldtype: "Column Break" },
-			{
-				fieldname: "year_level", fieldtype: "Data",
-				label: __("Year Level"), default: defaults.year_level,
-				placeholder: __("e.g. First Year"),
-			},
-			{ fieldtype: "Section Break" },
-			{
-				fieldname: "department", fieldtype: "Data",
+				fieldname: "department", fieldtype: "Link", options: "Departments",
 				label: __("Department"), default: defaults.department,
 			},
 			{ fieldtype: "Column Break" },
@@ -449,11 +604,21 @@ class TVMSProgramTimetable {
 
 		const fields = this._class_fields(entry);
 		fields.push(
-			{ fieldtype: "Section Break" },
+			{ fieldtype: "Section Break", label: __("Status & visibility") },
 			{
 				fieldname: "status", fieldtype: "Select",
 				label: __("Status"), default: entry.status,
 				options: "SCHEDULED\nCOMPLETED",
+			},
+			{ fieldtype: "Column Break" },
+			{
+				fieldname: "publish_status", fieldtype: "Select",
+				label: __("Publish Status"), default: entry.publish_status || "DRAFT",
+				options: "DRAFT\nPUBLISHED",
+				description: __(
+					"DRAFT = visible to admins only. " +
+					"PUBLISHED = visible to all lecturers, CRs, and students."
+				),
 			},
 		);
 
@@ -487,6 +652,158 @@ class TVMSProgramTimetable {
 						frappe.show_alert({ message: __("Timetable entry deleted"), indicator: "orange" });
 						d.hide();
 						self.load();
+					},
+				);
+			},
+		});
+
+		d.show();
+	}
+
+	// ------------------------------------------------------------------
+	// Publish workflow — turn DRAFT entries into the official timetable
+	// ------------------------------------------------------------------
+
+	_open_publish_dialog() {
+		const self = this;
+		const filters = this.get_filters();
+
+		const d = new frappe.ui.Dialog({
+			title: __("Publish Timetable"),
+			fields: [
+				{
+					fieldtype: "HTML",
+					options: `<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">
+						${__("Choose what to publish. Leave a filter blank to publish across all values.")}
+					</div>`,
+				},
+				{
+					fieldname: "program", fieldtype: "Link", options: "Program",
+					label: __("Program"), default: filters.program,
+				},
+				{ fieldtype: "Column Break" },
+				{
+					fieldname: "year_level", fieldtype: "Select",
+					label: __("Year Level"),
+					options: "\n1\n2\n3\n4\n5\n6",
+					default: filters.year_level,
+				},
+				{ fieldtype: "Section Break" },
+				{
+					fieldname: "semester", fieldtype: "Select",
+					label: __("Semester"),
+					options: "\nSemester 1\nSemester 2\nTrimester 1\nTrimester 2\nTrimester 3",
+					default: filters.semester,
+				},
+				{ fieldtype: "Column Break" },
+				{
+					fieldname: "academic_year", fieldtype: "Data",
+					label: __("Academic Year"),
+					default: filters.academic_year,
+					placeholder: __("e.g. 2026/2027"),
+				},
+				{ fieldtype: "Section Break" },
+				{
+					fieldtype: "HTML",
+					options: `<div style="background:var(--bg-yellow);padding:8px 12px;border-radius:6px;font-size:13px;">
+						<i class="fa fa-info-circle"></i> ${__("Published entries become visible to all lecturers, CRs, and students.")}
+					</div>`,
+				},
+			],
+			primary_action_label: __("Publish"),
+			primary_action: async (values) => {
+				const args = Object.fromEntries(
+					Object.entries(values).filter(([_, v]) => v),
+				);
+				d.set_primary_action(__("Publishing..."), null);
+				try {
+					const r = await frappe.xcall(
+						"tvms.tvms.doctype.timetable.timetable.publish_timetable",
+						args,
+					);
+					frappe.show_alert({
+						message: r.published
+							? __("Published {0} timetable entr{1}", [r.published, r.published === 1 ? "y" : "ies"])
+							: __("No draft entries matched."),
+						indicator: r.published ? "green" : "blue",
+					});
+					d.hide();
+					self.load();
+				} catch (e) {
+					d.set_primary_action(__("Publish"), () => d.get_primary_btn().trigger("click"));
+				}
+			},
+		});
+
+		d.show();
+	}
+
+	_open_unpublish_dialog() {
+		const self = this;
+		const filters = this.get_filters();
+
+		const d = new frappe.ui.Dialog({
+			title: __("Unpublish (move back to draft)"),
+			fields: [
+				{
+					fieldtype: "HTML",
+					options: `<div style="background:var(--bg-red);padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px;">
+						<i class="fa fa-exclamation-triangle"></i> ${__(
+							"This makes the timetable invisible to non-admin users. " +
+							"Use only when preparing a major schedule change."
+						)}
+					</div>`,
+				},
+				{
+					fieldname: "program", fieldtype: "Link", options: "Program",
+					label: __("Program"), default: filters.program,
+				},
+				{ fieldtype: "Column Break" },
+				{
+					fieldname: "year_level", fieldtype: "Select",
+					label: __("Year Level"),
+					options: "\n1\n2\n3\n4\n5\n6",
+					default: filters.year_level,
+				},
+				{ fieldtype: "Section Break" },
+				{
+					fieldname: "semester", fieldtype: "Select",
+					label: __("Semester"),
+					options: "\nSemester 1\nSemester 2\nTrimester 1\nTrimester 2\nTrimester 3",
+					default: filters.semester,
+				},
+				{ fieldtype: "Column Break" },
+				{
+					fieldname: "academic_year", fieldtype: "Data",
+					label: __("Academic Year"),
+					default: filters.academic_year,
+				},
+			],
+			primary_action_label: __("Unpublish"),
+			primary_action: async (values) => {
+				const args = Object.fromEntries(
+					Object.entries(values).filter(([_, v]) => v),
+				);
+				frappe.confirm(
+					__("Move matching published entries back to draft?"),
+					async () => {
+						d.set_primary_action(__("Unpublishing..."), null);
+						try {
+							const r = await frappe.xcall(
+								"tvms.tvms.doctype.timetable.timetable.unpublish_timetable",
+								args,
+							);
+							frappe.show_alert({
+								message: r.unpublished
+									? __("Moved {0} entr{1} back to draft", [r.unpublished, r.unpublished === 1 ? "y" : "ies"])
+									: __("No published entries matched."),
+								indicator: r.unpublished ? "orange" : "blue",
+							});
+							d.hide();
+							self.load();
+						} catch (e) {
+							d.set_primary_action(__("Unpublish"), () => d.get_primary_btn().trigger("click"));
+						}
 					},
 				);
 			},

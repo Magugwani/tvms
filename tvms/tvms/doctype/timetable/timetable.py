@@ -49,8 +49,6 @@ _COL_ALIASES = {
 	# Room / Venue
 	"room": "room", "room name": "room", "rooms": "room",
 }
-
-
 class Timetable(Document):
 
 	def validate(self):
@@ -140,6 +138,329 @@ class Timetable(Document):
 			).format(self.lecturer, c["course"], c["venue"] or "—",
 					 str(c["start_time"])[:5], str(c["end_time"])[:5], self.date))
 
+ADMIN_ROLES = {"System Manager", "Administrator", "Department Admin"}
+ 
+ 
+def _ensure_timetable_admin():
+	if not ADMIN_ROLES.intersection(frappe.get_roles()):
+		frappe.throw(_("Only Admins can manage timetable entries"), frappe.PermissionError)
+ 
+ 
+# -------------------------------------------------------------
+# FR-1, FR-2, FR-3 — Direct admin CRUD (no FET CSV required)
+# -------------------------------------------------------------
+ 
+@frappe.whitelist(methods=["POST"])
+def create_timetable_entry(
+	course: str,
+	date: str,
+	start_time: str,
+	end_time: str,
+	venue: str = None,
+	lecturer: str = None,
+	academic_year: str = None,
+	semester: str = None,
+	department: str = None,
+	program: str = None,
+	year_level: str = None,
+	students_groups: str = None,
+	repeat_weekly_until: str = None,
+):
+	"""Create one timetable entry directly from the admin UI.
+ 
+	If repeat_weekly_until is given, the same class is created every week
+	on the same weekday from `date` through that end date — the manual
+	equivalent of an FET CSV import for one recurring class.
+	"""
+	_ensure_timetable_admin()
+ 
+	if not course or not date or not start_time or not end_time:
+		frappe.throw(_("course, date, start_time and end_time are required"))
+ 
+	dates_to_create = [getdate(date)]
+	if repeat_weekly_until:
+		until = getdate(repeat_weekly_until)
+		start_date = getdate(date)
+		if until < start_date:
+			frappe.throw(_("repeat_weekly_until must be on or after date"))
+		dates_to_create = []
+		current = start_date
+		while current <= until:
+			dates_to_create.append(current)
+			current = add_days(current, 7)
+ 
+	created = []
+	for d in dates_to_create:
+		doc = frappe.new_doc("Timetable")
+		doc.course = course
+		doc.venue = venue
+		doc.lecturer = lecturer
+		doc.date = d
+		doc.start_time = start_time
+		doc.end_time = end_time
+		doc.academic_year = academic_year
+		doc.semester = semester
+		doc.department = department
+		doc.program = program
+		doc.year_level = year_level
+		doc.students_groups = students_groups
+		doc.status = "SCHEDULED"
+		doc.publish_status = "DRAFT"
+		doc.insert()
+		created.append(doc.name)
+ 
+	frappe.db.commit()
+	return {"created": created, "count": len(created)}
+ 
+ 
+@frappe.whitelist(methods=["POST"])
+def update_timetable_entry(name: str, **fields):
+	"""Update an existing Timetable entry. Only the fields passed are touched.
+	Conflict validation runs automatically via doc.save()."""
+	_ensure_timetable_admin()
+ 
+	if not frappe.db.exists("Timetable", name):
+		frappe.throw(_("Timetable entry not found: {0}").format(name), frappe.DoesNotExistError)
+ 
+	allowed = {
+		"course", "venue", "lecturer", "date", "start_time", "end_time",
+		"academic_year", "semester", "department", "program",
+		"year_level", "students_groups", "status", "publish_status",
+	}
+	doc = frappe.get_doc("Timetable", name)
+	for k, v in fields.items():
+		if k in allowed and v is not None:
+			doc.set(k, v)
+	doc.save()
+	frappe.db.commit()
+	return {"name": doc.name, "updated": True}
+ 
+ 
+@frappe.whitelist(methods=["POST"])
+def delete_timetable_entry(name: str):
+	"""Delete a single Timetable entry."""
+	_ensure_timetable_admin()
+	if not frappe.db.exists("Timetable", name):
+		frappe.throw(_("Timetable entry not found: {0}").format(name), frappe.DoesNotExistError)
+	frappe.delete_doc("Timetable", name, ignore_permissions=False)
+	frappe.db.commit()
+	return {"name": name, "deleted": True}
+ 
+ 
+@frappe.whitelist(methods=["GET"])
+def get_timetable_entry(name: str):
+	"""Return one entry pre-formatted for the edit dialog."""
+	_ensure_timetable_admin()
+	if not frappe.db.exists("Timetable", name):
+		frappe.throw(_("Timetable entry not found: {0}").format(name), frappe.DoesNotExistError)
+	doc = frappe.get_doc("Timetable", name)
+	return {
+		"name":            doc.name,
+		"course":          doc.course,
+		"venue":           doc.venue,
+		"lecturer":        doc.lecturer,
+		"date":            str(doc.date) if doc.date else None,
+		"start_time":      str(doc.start_time)[:5] if doc.start_time else None,
+		"end_time":        str(doc.end_time)[:5] if doc.end_time else None,
+		"academic_year":   doc.academic_year,
+		"semester":        doc.semester,
+		"department":      doc.department,
+		"program":         doc.program,
+		"year_level":      doc.year_level,
+		"students_groups": doc.students_groups,
+		"status":          doc.status,
+		"publish_status":  doc.publish_status,
+	}
+ 
+ 
+# -------------------------------------------------------------
+# Publish workflow — turns DRAFT entries into the official timetable
+# -------------------------------------------------------------
+ 
+@frappe.whitelist(methods=["POST"])
+def publish_timetable(
+	program: str = None,
+	year_level: str = None,
+	semester: str = None,
+	academic_year: str = None,
+):
+	"""Bulk publish: flip every matching DRAFT entry to PUBLISHED.
+ 
+	If no filters are given, ALL drafts are published. To publish only one
+	program-year (typical case), pass program and year_level.
+	"""
+	_ensure_timetable_admin()
+ 
+	filters = [["publish_status", "=", "DRAFT"]]
+	if program: filters.append(["program", "=", program])
+	if year_level: filters.append(["year_level", "=", str(year_level)])
+	if semester: filters.append(["semester", "=", semester])
+	if academic_year: filters.append(["academic_year", "=", academic_year])
+ 
+	drafts = frappe.db.get_all("Timetable", filters=filters, pluck="name")
+	for name in drafts:
+		frappe.db.set_value("Timetable", name, "publish_status", "PUBLISHED")
+ 
+	frappe.db.commit()
+ 
+	frappe.publish_realtime(
+		"tvms_timetable_published",
+		{"count": len(drafts), "program": program, "year_level": year_level},
+	)
+ 
+	return {"published": len(drafts), "filters": {
+		"program": program, "year_level": year_level,
+		"semester": semester, "academic_year": academic_year,
+	}}
+ 
+ 
+@frappe.whitelist(methods=["POST"])
+def unpublish_timetable(
+	program: str = None,
+	year_level: str = None,
+	semester: str = None,
+	academic_year: str = None,
+):
+	"""Reverse of publish — flip PUBLISHED back to DRAFT.
+	Use when a major schedule change is being prepared."""
+	_ensure_timetable_admin()
+ 
+	filters = [["publish_status", "=", "PUBLISHED"]]
+	if program: filters.append(["program", "=", program])
+	if year_level: filters.append(["year_level", "=", str(year_level)])
+	if semester: filters.append(["semester", "=", semester])
+	if academic_year: filters.append(["academic_year", "=", academic_year])
+ 
+	published = frappe.db.get_all("Timetable", filters=filters, pluck="name")
+	for name in published:
+		frappe.db.set_value("Timetable", name, "publish_status", "DRAFT")
+ 
+	frappe.db.commit()
+	return {"unpublished": len(published)}
+ 
+ 
+# -------------------------------------------------------------
+# Public timetable API — what non-admin users see
+# -------------------------------------------------------------
+ 
+@frappe.whitelist(methods=["GET"])
+def get_published_week_timetable(
+	week_start: str,
+	program: str = None,
+	year_level: str = None,
+	semester: str = None,
+	academic_year: str = None,
+):
+	"""Return only PUBLISHED entries for the given week. Used by the official
+	timetable viewer page that lecturers, CRs and students see."""
+ 
+	frappe.has_permission("Timetable", "read", throw=True)
+ 
+	if not week_start:
+		frappe.throw(_("week_start is required"))
+ 
+	start = getdate(week_start)
+	end = add_days(start, 7)
+ 
+	filters = [
+		["publish_status", "=", "PUBLISHED"],
+		["date", ">=", start],
+		["date", "<", end],
+	]
+	if program: filters.append(["program", "=", program])
+	if year_level: filters.append(["year_level", "=", str(year_level)])
+	if semester: filters.append(["semester", "=", semester])
+	if academic_year: filters.append(["academic_year", "=", academic_year])
+ 
+	rows = frappe.db.get_all(
+		"Timetable",
+		filters=filters,
+		fields=[
+			"name", "course", "lecturer", "venue", "date",
+			"day_of_week", "start_time", "end_time", "duration_hours",
+			"program", "year_level", "academic_year", "semester",
+			"department", "students_groups", "status",
+		],
+		order_by="date asc, start_time asc",
+	)
+ 
+	if not rows:
+		return {"sessions": [], "groups": [], "week_start": str(start), "week_end": str(end)}
+ 
+	course_codes = list({r["course"] for r in rows if r.get("course")})
+	venue_codes = list({r["venue"] for r in rows if r.get("venue")})
+	user_codes = list({r["lecturer"] for r in rows if r.get("lecturer")})
+ 
+	course_lookup = {
+		c["name"]: c for c in frappe.db.get_all(
+			"Course", filters={"name": ["in", course_codes]} if course_codes else None,
+			fields=["name", "course_code", "course_name"],
+		)
+	} if course_codes else {}
+ 
+	venue_lookup = {
+		v["name"]: v for v in frappe.db.get_all(
+			"Venue", filters={"name": ["in", venue_codes]} if venue_codes else None,
+			fields=["name", "venue_name", "building_name", "floor_number"],
+		)
+	} if venue_codes else {}
+ 
+	user_lookup = {
+		u["name"]: u["full_name"] for u in frappe.db.get_all(
+			"User", filters={"name": ["in", user_codes]} if user_codes else None,
+			fields=["name", "full_name"],
+		)
+	} if user_codes else {}
+ 
+	for r in rows:
+		c = course_lookup.get(r["course"], {})
+		v = venue_lookup.get(r["venue"], {})
+		r["course_code"] = c.get("course_code") or r.get("course") or ""
+		r["course_name"] = c.get("course_name") or r.get("course") or ""
+		r["venue_name"] = v.get("venue_name") or r.get("venue") or ""
+		r["venue_building"] = v.get("building_name") or ""
+		r["venue_floor"] = v.get("floor_number")
+		r["lecturer_name"] = user_lookup.get(r["lecturer"]) if r.get("lecturer") else ""
+		r["start_time"] = str(r["start_time"])[:5] if r.get("start_time") else ""
+		r["end_time"] = str(r["end_time"])[:5] if r.get("end_time") else ""
+		r["date"] = str(r["date"]) if r.get("date") else ""
+ 
+	groups_map = {}
+	for s in rows:
+		prog = s.get("program") or "Unassigned"
+		yl = s.get("year_level") or "Unassigned"
+		key = (prog, yl)
+		groups_map.setdefault(key, {
+			"program": prog,
+			"year_level": yl,
+			"label": f"{prog} — Year {yl}" if yl != "Unassigned" else prog,
+			"sessions": [],
+		})["sessions"].append(s)
+ 
+	groups = sorted(
+		groups_map.values(),
+		key=lambda g: (g["program"] == "Unassigned", g["program"], g["year_level"]),
+	)
+ 
+	return {
+		"sessions": rows,
+		"groups": groups,
+		"week_start": str(start),
+		"week_end": str(end),
+		"total_sessions": len(rows),
+	}
+ 
+ 
+@frappe.whitelist(methods=["GET"])
+def get_publish_status_summary():
+	"""Quick stat: how many DRAFT vs PUBLISHED entries currently exist.
+	Drives the publish button label on the admin page."""
+	frappe.has_permission("Timetable", "read", throw=True)
+	return {
+		"draft":     frappe.db.count("Timetable", {"publish_status": "DRAFT"}),
+		"published": frappe.db.count("Timetable", {"publish_status": "PUBLISHED"}),
+		"total":     frappe.db.count("Timetable"),
+	}
 
 # ==================================================================
 # FET CSV import engine
