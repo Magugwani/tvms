@@ -21,6 +21,9 @@
   "end_time",
   "status",
   "comment",
+  "postponed",
+  "original_start_time",
+  "postpone_reason",
   "confirmed",
   "confirmed_at",
   "amended_from"
@@ -125,6 +128,31 @@
    "label": "Confirmed At",
    "read_only": 1
   },
+
+   {
+     "fieldname":   "postponed",
+     "fieldtype":   "Check",
+     "label":       "Was Postponed",
+     "read_only":   1,
+     "default":     0,
+     "description": "Set automatically when postpone_session() is called"
+   },
+   {
+     "fieldname":   "original_start_time",
+     "fieldtype":   "Datetime",
+     "label":       "Original Start Time",
+     "read_only":   1,
+     "depends_on":  "eval:doc.postponed",
+     "description": "The first start_time set on this session — preserved across postponements"
+   },
+   {
+     "fieldname":   "postpone_reason",
+     "fieldtype":   "Small Text",
+     "label":       "Postpone Reason",
+     "read_only":   1,
+     "depends_on":  "eval:doc.postponed",
+     "description": "Reason supplied at the most recent postponement"
+   }, 
   {
    "fieldname": "amended_from",
    "fieldtype": "Link",

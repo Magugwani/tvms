@@ -443,7 +443,38 @@ class Emergencysession(Document):
 
 		return list(emails)
 
+
 	def _prepare_notification_message(self):
+		# Postponement gets a different layout — emphasise the time change
+		if self.flags.get("notification_type") == "postponement":
+			pd = self.flags.get("postpone_details", {})
+			return """
+				<h3>Session Postponed</h3>
+				<p><strong>Session:</strong> {0}</p>
+				<p><strong>Title:</strong> {1}</p>
+				<p><strong>Venue:</strong> {2}</p>
+				<p><strong>Course:</strong> {3}</p>
+				<table style="border-collapse:collapse;margin:12px 0;">
+					<tr>
+						<td style="padding:4px 14px 4px 0;color:#888;">Was:</td>
+						<td style="padding:4px 0;text-decoration:line-through;">{4} - {5}</td>
+					</tr>
+					<tr>
+						<td style="padding:4px 14px 4px 0;color:#888;">Now:</td>
+						<td style="padding:4px 0;font-weight:600;">{6} - {7}</td>
+					</tr>
+				</table>
+				<p><strong>Reason:</strong> {8}</p>
+				<p><strong>Status:</strong> {9}</p>
+			""".format(
+				self.name, self.title, self.venue or "N/A", self.course or "N/A",
+				pd.get("old_start") or "—", pd.get("old_end") or "—",
+				pd.get("new_start") or "—", pd.get("new_end") or "—",
+				pd.get("reason") or _("Not specified"),
+				self.status,
+			)
+ 
+		# Default — used for confirm / cancel / complete / expire
 		return """
 			<h3>Emergency Session Update</h3>
 			<p><strong>Session:</strong> {0}</p>
@@ -524,6 +555,116 @@ def create_emergency_session(
 def confirm_emergency_session(name: str):
 	"""Confirm a PENDING session."""
 	return frappe.get_doc("Emergency session", name).confirm_session()
+
+@frappe.whitelist(methods=["POST"])
+def postpone_emergency_session(
+	name: str,
+	new_start_time: str,
+	new_end_time: str,
+	reason: str = None,
+):
+	"""Reschedule an emergency session to a new time slot.
+ 
+	Whitelisted wrapper around Emergencysession.postpone_session() so it can
+	be called from custom Desk pages, the mobile app, or external integrations.
+	"""
+	return frappe.get_doc("Emergency session", name).postpone_session(
+		new_start_time=new_start_time,
+		new_end_time=new_end_time,
+		reason=reason,
+	)
+ 
+
+@frappe.whitelist()
+def postpone_session(self, new_start_time: str, new_end_time: str, reason: str = None):
+		"""FR-32 — Reschedule a session to a new time without changing its identity.
+ 
+		Allowed only while the session is still actionable (PENDING or CONFIRMED).
+		The session's status is preserved — postponing a CONFIRMED session keeps
+		it CONFIRMED at the new time. The standard validation chain runs against
+		the new times so venue and lecturer conflicts are caught automatically.
+ 
+		Args:
+		    new_start_time -- ISO datetime string for the new start
+		    new_end_time   -- ISO datetime string for the new end
+		    reason         -- optional explanation surfaced to CRs / students
+ 
+		Raises:
+		    ValidationError if the new times overlap an existing booking, exceed
+		    the configured max session duration, or violate the time-range check.
+		"""
+		# Guard: must be in an actionable state
+		if self.status not in ("PENDING", "CONFIRMED"):
+			frappe.throw(_(
+				"Only PENDING or CONFIRMED sessions can be postponed. "
+				"This session is currently {0}."
+			).format(self.status))
+ 
+		if not new_start_time or not new_end_time:
+			frappe.throw(_("Both new start time and new end time are required"))
+ 
+		# Refuse a no-op postpone (admin clicked Postpone but didn't change anything)
+		if (get_datetime(new_start_time) == get_datetime(self.start_time)
+				and get_datetime(new_end_time) == get_datetime(self.end_time)):
+			frappe.throw(_("New times are the same as the current times — nothing to postpone"))
+ 
+		# Capture the FIRST original start time we ever see (preserve across multiple postponements)
+		if not self.postponed:
+			self.original_start_time = self.start_time
+ 
+		old_start = self.start_time
+		old_end   = self.end_time
+ 
+		# Apply the new times — the standard validate() chain will re-run when we save:
+		#   _validate_time_range       — checks start < end
+		#   _validate_session_duration — checks against max_session_hours
+		#   _validate_venue_capacity   — unchanged (venue same, capacity same)
+		#   _check_venue_availability  — re-runs against NEW slot
+		#   _check_lecturer_availability — re-runs against NEW slot
+		self.start_time      = new_start_time
+		self.end_time        = new_end_time
+		self.postponed       = 1
+		self.postpone_reason = reason or None
+ 
+		# Flags consumed by on_update / notifications below
+		self.flags.status_action     = True   # not a status change, but bypass the protection
+		self.flags.notification_type = "postponement"
+		self.flags.postpone_details  = {
+			"old_start":  str(old_start)[:16] if old_start else None,
+			"old_end":    str(old_end)[:16] if old_end else None,
+			"new_start":  str(new_start_time)[:16],
+			"new_end":    str(new_end_time)[:16],
+			"reason":     reason or "",
+		}
+ 
+		self.save()
+ 
+		# Explicit audit log — _log_action wraps the timeline comment
+		self._log_action(_(
+			"Session postponed from {0}–{1} to {2}–{3}. Reason: {4}"
+		).format(
+			str(old_start)[:16] if old_start else "—",
+			str(old_end)[:16] if old_end else "—",
+			str(new_start_time)[:16],
+			str(new_end_time)[:16],
+			reason or _("(none supplied)"),
+		))
+ 
+		# Trigger notifications independently of status-change pathway.
+		# on_update only fires _send_status_notification when status changes —
+		# we changed times, not status, so we trigger it explicitly here.
+		self._send_status_notification()
+		self._notify_crs()
+ 
+		return {
+			"name":           self.name,
+			"old_start_time": str(old_start)[:16] if old_start else None,
+			"old_end_time":   str(old_end)[:16] if old_end else None,
+			"new_start_time": str(new_start_time)[:16],
+			"new_end_time":   str(new_end_time)[:16],
+			"status":         self.status,
+			"postponed":      True,
+		}
 
 
 @frappe.whitelist(methods=["POST"])
