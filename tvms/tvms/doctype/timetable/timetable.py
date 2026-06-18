@@ -10,6 +10,13 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_days, get_time, getdate
 
+from tvms.tvms.doctype.timetable.notification_engine import (
+	notify_timetable_entry_change,
+	notify_timetable_entry_deleted,
+	notify_bulk_publish,
+	notify_bulk_unpublish,
+)
+
 _TVMS_LOGGED_FIELDS = [
 	"course", "venue", "lecturer", "date", "start_time", "end_time",
 	"day_of_week", "duration_hours", "status", "publish_status",
@@ -238,8 +245,10 @@ class Timetable(Document):
 		except Exception:
 			self.flags._tvms_old_state = None
  
+
 	def on_update(self):
-		"""Write a CREATED or UPDATED row to Timetable Change Log."""
+		"""Write a CREATED or UPDATED row to Timetable Change Log,
+		and fire FR-42 notifications for published-entry changes."""
 		try:
 			old_state = self.flags.get("_tvms_old_state")
 			new_state = {f: self.get(f) for f in _TVMS_LOGGED_FIELDS}
@@ -253,6 +262,15 @@ class Timetable(Document):
 					snapshot_before=None,
 					snapshot_after=new_state,
 				)
+				# Don't notify on CREATED — admins create drafts first.
+				# If they create directly as PUBLISHED that's unusual but supported:
+				if (self.get("publish_status") or "DRAFT") == "PUBLISHED":
+					notify_timetable_entry_change(
+						timetable_doc=self,
+						changes=[{"fieldname": "publish_status", "old": "DRAFT", "new": "PUBLISHED"}],
+						old_state={"publish_status": "DRAFT"},
+						action="CREATED_PUBLISHED",
+					)
 				return
  
 			# Subsequent save — diff field by field
@@ -291,6 +309,17 @@ class Timetable(Document):
 				snapshot_before=old_state,
 				snapshot_after=new_state,
 			)
+ 
+			# FR-42 — dispatch user-facing notifications AFTER the audit write.
+			# The engine decides whether the change is notification-worthy
+			# (drafts → silent; published → notify lecturer/CRs/students).
+			notify_timetable_entry_change(
+				timetable_doc=self,
+				changes=changes,
+				old_state=old_state,
+				action=action,
+			)
+ 
 		except Exception:
 			# A failed log write must never block the user's save
 			frappe.logger().warning(
@@ -299,7 +328,7 @@ class Timetable(Document):
 			)
  
 	def on_trash(self):
-		"""Write a DELETED row to Timetable Change Log before the entry vanishes."""
+		"""Write a DELETED row to Timetable Change Log AND notify if published."""
 		try:
 			snapshot = {f: self.get(f) for f in _TVMS_LOGGED_FIELDS}
 			log_change(
@@ -309,6 +338,9 @@ class Timetable(Document):
 				snapshot_before=snapshot,
 				snapshot_after=None,
 			)
+			# FR-42 — notify lecturer + CRs + students when a published class disappears.
+			# The engine itself checks publish_status and skips draft deletes.
+			notify_timetable_entry_deleted(timetable_doc=self)
 		except Exception:
 			frappe.logger().warning(
 				f"[TVMS] Failed to log delete for Timetable {self.name}",
@@ -633,7 +665,6 @@ def preview_conflicts(
 # ============================================================
 # Publish workflow — DRAFT → PUBLISHED (official timetable)
 # ============================================================
-
 @frappe.whitelist(methods=["POST"])
 def publish_timetable(
 	program: str = None,
@@ -642,37 +673,43 @@ def publish_timetable(
 	academic_year: str = None,
 ):
 	"""Bulk publish: flip every matching DRAFT entry to PUBLISHED.
-
-	With no filters → publishes ALL drafts (use carefully).
-	With program + year_level → publishes one program-year segment (typical).
+ 
+	After publishing, fires ONE aggregate notification per recipient
+	(not one per entry — that would be hundreds of bell pings).
 	"""
 	_ensure_timetable_admin()
-
+ 
 	filters = [["publish_status", "=", "DRAFT"]]
-	if program:       filters.append(["program",       "=", program])
-	if year_level:    filters.append(["year_level",    "=", str(year_level)])
-	if semester:      filters.append(["semester",      "=", semester])
+	if program:       filters.append(["program", "=", program])
+	if year_level:    filters.append(["year_level", "=", str(year_level)])
+	if semester:      filters.append(["semester", "=", semester])
 	if academic_year: filters.append(["academic_year", "=", academic_year])
-
+ 
 	drafts = frappe.db.get_all("Timetable", filters=filters, pluck="name")
 	for name in drafts:
 		frappe.db.set_value("Timetable", name, "publish_status", "PUBLISHED")
-
+ 
 	frappe.db.commit()
-
+ 
+	# Existing realtime ping for Desk-page listeners
 	frappe.publish_realtime(
 		"tvms_timetable_published",
 		{"count": len(drafts), "program": program, "year_level": year_level},
 	)
-
-	return {
-		"published": len(drafts),
-		"filters": {
-			"program": program, "year_level": year_level,
-			"semester": semester, "academic_year": academic_year,
-		},
-	}
-
+ 
+	# FR-42 — aggregate notification to every recipient (CRs + students)
+	notify_bulk_publish(
+		program=program,
+		year_level=year_level,
+		semester=semester,
+		academic_year=academic_year,
+		count=len(drafts),
+	)
+ 
+	return {"published": len(drafts), "filters": {
+		"program": program, "year_level": year_level,
+		"semester": semester, "academic_year": academic_year,
+	}}
 
 @frappe.whitelist(methods=["POST"])
 def unpublish_timetable(
@@ -684,20 +721,29 @@ def unpublish_timetable(
 	"""Reverse of publish — flip PUBLISHED back to DRAFT.
 	Use when a major schedule change is being prepared."""
 	_ensure_timetable_admin()
-
+ 
 	filters = [["publish_status", "=", "PUBLISHED"]]
-	if program:       filters.append(["program",       "=", program])
-	if year_level:    filters.append(["year_level",    "=", str(year_level)])
-	if semester:      filters.append(["semester",      "=", semester])
+	if program:       filters.append(["program", "=", program])
+	if year_level:    filters.append(["year_level", "=", str(year_level)])
+	if semester:      filters.append(["semester", "=", semester])
 	if academic_year: filters.append(["academic_year", "=", academic_year])
-
+ 
 	published = frappe.db.get_all("Timetable", filters=filters, pluck="name")
 	for name in published:
 		frappe.db.set_value("Timetable", name, "publish_status", "DRAFT")
-
+ 
 	frappe.db.commit()
+ 
+	# FR-42 — let users know the timetable is being reorganised
+	notify_bulk_unpublish(
+		program=program,
+		year_level=year_level,
+		semester=semester,
+		academic_year=academic_year,
+		count=len(published),
+	)
+ 
 	return {"unpublished": len(published)}
-
 
 @frappe.whitelist(methods=["GET"])
 def get_publish_status_summary():
