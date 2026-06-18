@@ -1,0 +1,22 @@
+{
+ "creation": "2026-06-18 00:00:00.000000",
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-06-18 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "venue-map",
+ "owner": "Administrator",
+ "page_name": "venue-map",
+ "roles": [
+  {"role": "System Manager"},
+  {"role": "Administrator"},
+  {"role": "Department Admin"},
+  {"role": "Lecturer"},
+  {"role": "Class Representative (CR)"},
+  {"role": "Student"}
+ ],
+ "standard": "Yes",
+ "system_page": 0,
+ "title": "Venue Map"
+}

@@ -169,6 +169,44 @@ class TVMSVenueGrid {
 				.tvms-venue-filter-bar { grid-template-columns: 1fr; }
 				.tvms-venue-summary { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
 			}
+				.tvms-venue-building-row {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				margin: 4px 0 6px;
+				font-size: 13px;
+				color: var(--text-color);
+				font-weight: 500;
+			}
+			.tvms-venue-building-row .ti {
+				color: var(--text-muted);
+				font-size: 14px;
+			}
+			.tvms-venue-type-tag {
+				display: inline-block;
+				margin-left: 6px;
+				padding: 1px 6px;
+				border-radius: 3px;
+				background: var(--subtle-fg);
+				font-size: 10px;
+				color: var(--text-muted);
+				text-transform: uppercase;	
+				letter-spacing: 0.03em;
+			}
+			.tvms-gps-indicator {
+				color: #40cdf0;
+				margin-left: 6px;
+				font-size: 12px;
+				vertical-align: -1px;
+			}
+			.tvms-accessibility {
+				display: flex;
+				align-items: center;
+				gap: 4px;
+				color: #185FA5;
+				font-size: 12px;
+			}
+			.tvms-accessibility .ti { font-size: 14px; }			
 		</style>`).appendTo("head");
 	}
 
@@ -178,6 +216,13 @@ class TVMSVenueGrid {
 		this.$body.find("[data-filter='search']").on("keyup", frappe.utils.debounce(() => this.load(), 300));
 
 		frappe.realtime.on("venue_status_update", () => this.load());
+				this.$body.on("click", "[data-open-map]", (e) => {
+			const venue = $(e.currentTarget).data("open-map");
+			frappe.set_route("venue-map");
+			// Optional: pass venue name via session so the map can
+			// auto-focus on it once loaded
+			frappe.utils.set_url_arg("venue", venue);
+		});
 	}
 
 	apply_route_options() {
@@ -272,24 +317,64 @@ class TVMSVenueGrid {
 			</div>
 		`).join("");
 
+		const floor_display = venue.floor_label
+			? frappe.utils.escape_html(venue.floor_label)
+			: (venue.floor_number !== undefined && venue.floor_number !== null
+				? __("Floor {0}", [venue.floor_number])
+				: "");
+		const building_floor = [
+			venue.building_name ? frappe.utils.escape_html(venue.building_name) : null,
+			floor_display || null,
+		].filter(Boolean).join(" · ");
+ 
+		const accessibility = (venue.accessibility_features || "").trim();
+		const has_gps = venue.has_coordinates || (venue.latitude && venue.longitude);
+		const venue_type = venue.venue_type
+			? frappe.utils.escape_html(venue.venue_type)
+			: "";
+ 
 		return `
 			<div class="tvms-venue-card">
 				<div class="tvms-venue-card-head">
 					<div>
 						<div class="tvms-venue-title">${frappe.utils.escape_html(venue.venue_name || venue.name)}</div>
-						<div class="tvms-venue-subtitle">${frappe.utils.escape_html(venue.venue_code || venue.name || "")}</div>
+						<div class="tvms-venue-subtitle">
+							${frappe.utils.escape_html(venue.venue_code || venue.name || "")}
+							${venue_type ? `<span class="tvms-venue-type-tag">${venue_type}</span>` : ""}
+							${has_gps ? `<i class="ti ti-map-pin tvms-gps-indicator" title="${__('GPS location available')}"></i>` : ""}
+						</div>
 					</div>
 					<span class="tvms-status-badge ${badge_class}">${frappe.utils.escape_html(status)}</span>
 				</div>
+ 
+				${building_floor ? `
+					<div class="tvms-venue-building-row">
+						<i class="ti ti-building"></i>
+						<span>${building_floor}</span>
+					</div>
+				` : ""}
+ 
 				<div class="tvms-venue-subtitle">${frappe.utils.escape_html(venue.location || __("No location"))}</div>
-				<div class="tvms-venue-subtitle">${__("Capacity")}: ${frappe.utils.escape_html(venue.capacity || "0")}</div>
+				<div class="tvms-venue-subtitle">${__("Capacity")}: ${frappe.utils.escape_html(venue.capacity || "0")} ${__("people")}</div>
 				<div class="tvms-venue-subtitle">${__("Resources")}: ${frappe.utils.escape_html(venue.resources || __("None"))}</div>
+ 
+				${accessibility ? `
+					<div class="tvms-venue-subtitle tvms-accessibility">
+						<i class="ti ti-accessible"></i> ${frappe.utils.escape_html(accessibility)}
+					</div>
+				` : ""}
+ 
 				<div class="tvms-booking-list">
 					${bookings || `<div class="tvms-booking-meta">${__("No current or upcoming bookings.")}</div>`}
 				</div>
 				<div class="mt-3 flex">
 					<button class="btn btn-xs btn-default mr-2" data-open-venue="${frappe.utils.escape_html(venue.name)}">${__("Open Venue")}</button>
-					<button class="btn btn-xs btn-default" data-open-timetable="${frappe.utils.escape_html(venue.name)}">${__("Timetable")}</button>
+					<button class="btn btn-xs btn-default mr-2" data-open-timetable="${frappe.utils.escape_html(venue.name)}">${__("Timetable")}</button>
+					${has_gps ? `
+						<button class="btn btn-xs btn-default" data-open-map="${frappe.utils.escape_html(venue.name)}">
+							<i class="ti ti-map"></i> ${__("View on Map")}
+						</button>
+					` : ""}
 				</div>
 			</div>
 		`;
