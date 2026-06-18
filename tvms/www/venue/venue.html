@@ -1,0 +1,371 @@
+{% extends "templates/web.html" %}
+
+{% block title %}{{ venue.venue_name if venue else _("Venue not found") }}{% endblock %}
+
+{% block head_include %}
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css">
+<style>
+  body {
+    margin: 0;
+    background: #f7f5f0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #2c2c2a;
+    -webkit-font-smoothing: antialiased;
+  }
+  .public-page {
+    max-width: 560px;
+    margin: 0 auto;
+    background: #fff;
+    min-height: 100vh;
+    padding: 0;
+  }
+  .pp-hero {
+    background: linear-gradient(180deg, #185FA5 0%, #0C447C 100%);
+    color: #fff;
+    padding: 28px 24px 24px;
+  }
+  .pp-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255, 255, 255, 0.85);
+    text-decoration: none;
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+  .pp-back:hover { color: #fff; }
+  .pp-title {
+    font-size: 26px;
+    font-weight: 500;
+    margin: 0 0 4px;
+    line-height: 1.2;
+  }
+  .pp-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.75);
+    letter-spacing: 0.05em;
+  }
+  .pp-type-tag {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 3px 10px;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 20px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Big actionable buttons — the main CTAs for visitors */
+  .pp-actions {
+    padding: 18px 18px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .pp-action {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid #d3d1c7;
+    background: #fff;
+    color: #2c2c2a;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.05s, background 0.15s;
+  }
+  .pp-action:active { transform: scale(0.99); }
+  .pp-action-primary {
+    background: #185FA5;
+    border-color: #185FA5;
+    color: #fff;
+  }
+  .pp-action-primary:hover {
+    background: #0C447C;
+    color: #fff;
+  }
+  .pp-action-icon {
+    font-size: 22px;
+    line-height: 1;
+  }
+  .pp-action-text { flex: 1; }
+  .pp-action-sub {
+    display: block;
+    font-size: 12px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.85);
+    margin-top: 1px;
+  }
+  .pp-action:not(.pp-action-primary) .pp-action-sub {
+    color: #888780;
+  }
+  .pp-chevron {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 18px;
+  }
+  .pp-action:not(.pp-action-primary) .pp-chevron {
+    color: #b4b2a9;
+  }
+
+  /* Info sections */
+  .pp-section {
+    padding: 18px;
+    border-bottom: 1px solid #ececec;
+  }
+  .pp-section:last-of-type { border-bottom: none; }
+  .pp-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #888780;
+    font-weight: 500;
+    margin-bottom: 10px;
+  }
+  .pp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .pp-grid-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888780;
+    font-weight: 500;
+    margin-bottom: 3px;
+  }
+  .pp-grid-value {
+    font-size: 14px;
+    color: #2c2c2a;
+  }
+
+  .pp-notes {
+    background: #E6F1FB;
+    color: #185FA5;
+    border-radius: 8px;
+    padding: 14px 16px;
+    line-height: 1.5;
+    font-size: 14px;
+  }
+  .pp-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .pp-tag {
+    padding: 4px 10px;
+    background: #f1efe8;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #5f5e5a;
+  }
+  .pp-tag-access {
+    background: #E6F1FB;
+    color: #185FA5;
+  }
+
+  /* Inline map */
+  .pp-map {
+    height: 220px;
+    background: #f1efe8;
+  }
+  #pp-mapbox-container { height: 100%; width: 100%; }
+
+  .pp-error {
+    padding: 60px 30px;
+    text-align: center;
+    color: #888780;
+  }
+  .pp-error-icon {
+    font-size: 48px;
+    color: #d3d1c7;
+    margin-bottom: 12px;
+  }
+  .pp-error-title {
+    font-size: 18px;
+    font-weight: 500;
+    color: #2c2c2a;
+    margin: 0 0 6px;
+  }
+  .pp-error-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    background: #f1efe8;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-top: 10px;
+    display: inline-block;
+  }
+
+  .pp-footer {
+    text-align: center;
+    color: #b4b2a9;
+    font-size: 11px;
+    padding: 20px;
+    border-top: 1px solid #ececec;
+  }
+
+  /* Tablet+ */
+  @media (min-width: 640px) {
+    body { padding: 24px 0; }
+    .public-page {
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+      min-height: 0;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block page_content %}
+<div class="public-page">
+
+{% if venue %}
+
+  <div class="pp-hero">
+    {% if venue.building_name %}
+    <a href="javascript:history.back()" class="pp-back">
+      ← {{ venue.building_name }}
+    </a>
+    {% endif %}
+    <h1 class="pp-title">{{ venue.venue_name }}</h1>
+    <div class="pp-code">{{ venue.name }}</div>
+    {% if venue.venue_type %}
+    <span class="pp-type-tag">{{ venue.venue_type }}</span>
+    {% endif %}
+  </div>
+
+  {# ─── Primary actions ─────────────────────────────────────── #}
+  <div class="pp-actions">
+    {% if venue.directions_url %}
+    <a class="pp-action pp-action-primary" href="{{ venue.directions_url }}"
+       target="_blank" rel="noopener">
+      <span class="pp-action-icon">🚶</span>
+      <span class="pp-action-text">
+        {{ _("Walking directions") }}
+        <span class="pp-action-sub">{{ _("Opens in maps") }}</span>
+      </span>
+      <span class="pp-chevron">›</span>
+    </a>
+    {% endif %}
+  </div>
+
+  {# ─── Building and floor info — FR-21/23 ──────────────────── #}
+  <div class="pp-section" style="padding-top: 22px;">
+    <div class="pp-grid">
+      {% if venue.building_name %}
+      <div>
+        <div class="pp-grid-label">{{ _("Building") }}</div>
+        <div class="pp-grid-value">{{ venue.building_name }}</div>
+      </div>
+      {% endif %}
+      <div>
+        <div class="pp-grid-label">{{ _("Floor") }}</div>
+        <div class="pp-grid-value">{{ venue.floor_label }}</div>
+      </div>
+      {% if venue.location %}
+      <div>
+        <div class="pp-grid-label">{{ _("Location") }}</div>
+        <div class="pp-grid-value">{{ venue.location }}</div>
+      </div>
+      {% endif %}
+      {% if venue.capacity %}
+      <div>
+        <div class="pp-grid-label">{{ _("Capacity") }}</div>
+        <div class="pp-grid-value">{{ venue.capacity }} {{ _("people") }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ─── Inline map preview ─────────────────────────────────── #}
+  {% if mapbox_token and venue.latitude and venue.longitude %}
+  <div class="pp-map">
+    <div id="pp-mapbox-container"></div>
+  </div>
+  {% endif %}
+
+  {# ─── Navigation notes — FR-24 indoor wayfinding ──────────── #}
+  {% if venue.navigation_notes %}
+  <div class="pp-section">
+    <div class="pp-section-title">{{ _("How to get there") }}</div>
+    <div class="pp-notes">{{ venue.navigation_notes }}</div>
+  </div>
+  {% endif %}
+
+  {# ─── Accessibility ─────────────────────────────────────── #}
+  {% if venue.accessibility_features %}
+  <div class="pp-section">
+    <div class="pp-section-title">{{ _("Accessibility") }}</div>
+    <div class="pp-tags">
+      {% for feature in venue.accessibility_features.split(",") if feature.strip() %}
+      <span class="pp-tag pp-tag-access">{{ feature.strip() }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ─── Resources ─────────────────────────────────────────── #}
+  {% if venue.resources %}
+  <div class="pp-section">
+    <div class="pp-section-title">{{ _("Available resources") }}</div>
+    <div class="pp-tags">
+      {% for resource in venue.resources.split(",") if resource.strip() %}
+      <span class="pp-tag">{{ resource.strip() }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="pp-footer">
+    Timetable and Venue Management System
+  </div>
+
+  {# ─── Embedded Mapbox map ───────────────────────────────── #}
+{% if mapbox_token and venue.latitude and venue.longitude %}
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+<script>
+  mapboxgl.accessToken = "{{ mapbox_token | tojson }}";
+  const lng = "{{ venue.longitude | tojson }}";
+  const lat = "{{ venue.latitude | tojson }}";
+
+  const map = new mapboxgl.Map({
+    container: "pp-mapbox-container",
+    style: "mapbox://styles/mapbox/streets-v12",
+    center: [lng, lat],
+    zoom: 17,
+    interactive: true,
+    attributionControl: false
+  });
+
+  new mapboxgl.Marker({ color: "#185FA5" })
+    .setLngLat([lng, lat])
+    .addTo(map);
+
+  map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+</script>
+{% endif %}
+
+{% else %}
+
+  {# ─── Error fallback ──────────────────────────────────── #}
+  <div class="pp-error">
+    <div class="pp-error-icon">📍</div>
+    <h2 class="pp-error-title">{{ _("Venue not found") }}</h2>
+    <p>{{ error_message }}</p>
+    {% if venue_code_searched %}
+    <div class="pp-error-code">{{ venue_code_searched }}</div>
+    {% endif %}
+  </div>
+
+{% endif %}
+
+</div>
+{% endblock %}

@@ -63,6 +63,13 @@ app_license = "mit"
 # role_home_page = {
 # 	"Role": "home_page"
 # }
+website_route_rules = [
+	{
+		"from_route": "/venue/<venue_code>",
+		"to_route":   "venue",
+	},
+]
+ 
 
 # Generators
 # ----------

@@ -15,7 +15,6 @@ VENUE_VIEW_ROLES = {
 	"Student",
 }
 
-
 class Venue(Document):
 
 	# ---------------------------------------------------------------
@@ -444,6 +443,180 @@ def _floor_label(n):
 	suffix = suffixes.get(n if n <= 3 else 0, "th")
 	return f"{n}{suffix} floor"
 
+# ───  Public navigation endpoint for guest (no login) ──────
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def get_public_venue_navigation(venue: str):
+	"""FR-24: Guest-readable subset of venue info for the public
+	/venue/<code> page.
+ 
+	Returns only navigation-relevant fields. Live status, current
+	bookings, and the booking-window helper are deliberately
+	excluded — those are private to logged-in users.
+ 
+	Args:
+	    venue -- the Venue docname (e.g. "LH-01"). Case-sensitive.
+ 
+	Returns dict or raises 404 if the venue doesn't exist or has
+	no GPS coordinates (we don't surface venues that can't actually
+	be navigated to).
+	"""
+	if not venue or not frappe.db.exists("Venue", venue):
+		frappe.local.response.http_status_code = 404
+		return {"error": "Venue not found"}
+ 
+	# Read with ignore_permissions because this endpoint is intentionally guest-accessible.
+	# We control the field selection here to keep sensitive data out.
+	doc = frappe.get_doc("Venue", venue)
+ 
+	# Refuse to surface venues without GPS — these are unreachable
+	# via navigation, so the public page can't help.
+	if not (doc.latitude and doc.longitude):
+		frappe.local.response.http_status_code = 404
+		return {"error": "This venue has no navigation data set"}
+ 
+	return {
+		"name":              doc.name,
+		"venue_name":        doc.venue_name,
+		"venue_type":        doc.venue_type or "",
+		"building_name":     doc.building_name or "",
+		"floor_number":      doc.floor_number if doc.floor_number is not None else 0,
+		"floor_label":       doc.get_floor_label(),
+		"location":          doc.location or "",
+		"capacity":          doc.capacity or 0,
+		"resources":         doc.resources or "",
+		"accessibility_features": doc.accessibility_features or "",
+		"navigation_notes":  doc.navigation_notes or "",
+		"latitude":          float(doc.latitude),
+		"longitude":         float(doc.longitude),
+		# Pre-built directions URL so the public page doesn't have to
+		# assemble it client-side (also lets us swap the provider later
+		# without changing the page).
+		"directions_url":    get_venue_directions_link(doc.name),
+	}
+
+# ─── Venue Directions URL helper ───────────────────────
+ 
+def get_venue_directions_link(venue: str, travel_mode: str = "walking") -> str:
+	"""Return a Google Maps deep-link URL for walking directions.
+ 
+	Used by:
+	- The public venue page (embedded in the "Get directions" button)
+	- Timetable entries (when showing "Where is this class?")
+	- Emergency session notifications ("Find your new room")
+	- Any future Flutter screen needing a directions handoff
+ 
+	On mobile this URL auto-opens the user's preferred maps app
+	(Google Maps on Android, Apple Maps on iOS via system fallback)
+	with walking directions to the venue's coordinates.
+ 
+	Returns an empty string if the venue has no GPS coordinates.
+	"""
+	if not venue or not frappe.db.exists("Venue", venue):
+		return ""
+ 
+	row = frappe.db.get_value(
+		"Venue",
+		venue,
+		["latitude", "longitude", "venue_name"],
+		as_dict=True,
+	)
+	if not row or not row.get("latitude") or not row.get("longitude"):
+		return ""
+ 
+	return (
+		f"https://www.google.com/maps/dir/?api=1"
+		f"&destination={row['latitude']},{row['longitude']}"
+		f"&travelmode={travel_mode}"
+	)
+ 
+ 
+@frappe.whitelist(methods=["GET"])
+def get_venue_directions(venue: str, travel_mode: str = "walking"):
+	"""Whitelisted wrapper around get_venue_directions_link().
+ 
+	Used by Flutter / Desk JS to fetch the directions URL for a
+	specific venue. Returns {'url': '...'} or {'url': null} if no
+	coordinates.
+	"""
+	_ensure_venue_view_access()
+	url = get_venue_directions_link(venue, travel_mode)
+	return {"url": url or None, "venue": venue, "travel_mode": travel_mode}
+ 
+
+# ─── QR generator (admin only) ────────
+@frappe.whitelist(methods=["GET"])
+def generate_venue_qr(venue: str, size: int = 320, return_format: str = "data_url"):
+	"""FR-24: Generate a QR code PNG for the public venue page.
+ 
+	The QR encodes the public URL: <site>/venue/<venue-code>
+	When scanned, the visitor lands on the guest navigation page
+	and can tap "Get directions" to be walked to the room.
+ 
+	Args:
+	    venue          -- Venue docname
+	    size           -- QR PNG size in pixels (default 320)
+	    return_format  -- 'data_url' (default) returns a base64 data URL
+	                       suitable for embedding in <img src=...>
+	                      'binary' streams the PNG as a downloadable file
+ 
+	Returns:
+	    - data_url mode: {'data_url': 'data:image/png;base64,...', 'url': '...', 'venue': '...'}
+	    - binary mode:   PNG bytes via frappe.local.response (browser downloads)
+	"""
+	_ensure_venue_view_access()
+ 
+	if not venue or not frappe.db.exists("Venue", venue):
+		frappe.throw(_("Venue not found: {0}").format(venue), frappe.DoesNotExistError)
+ 
+	# Build the public URL — always points to the guest-accessible page
+	# regardless of how the admin reached this endpoint
+	site_url = frappe.utils.get_url()
+	target_url = f"{site_url}/venue/{venue}"
+ 
+	# qrcode is shipped with Frappe (used internally for some integrations).
+	# If for some reason it's missing in your environment, install via:
+	#   ./env/bin/pip install qrcode pillow
+	try:
+		import qrcode
+	except ImportError:
+		frappe.throw(_(
+			"The 'qrcode' library is not installed. Run from your bench dir: "
+			"./env/bin/pip install qrcode pillow"
+		))
+ 
+	# Build the QR — error correction Q so a small dirty/scratched code
+	# still scans. Size = box_size * (modules + border).
+	qr = qrcode.QRCode(
+		version=None,                        # auto-pick smallest fit
+		error_correction=qrcode.constants.ERROR_CORRECT_Q,
+		box_size=max(int(size) // 35, 4),
+		border=2,
+	)
+	qr.add_data(target_url)
+	qr.make(fit=True)
+ 
+	img = qr.make_image(fill_color="black", back_color="white")
+ 
+	import io
+	buf = io.BytesIO()
+	img.save(buf, format="PNG")
+	png_bytes = buf.getvalue()
+ 
+	if return_format == "binary":
+		frappe.local.response.filename = f"venue_{venue}_qr.png"
+		frappe.local.response.filecontent = png_bytes
+		frappe.local.response.type = "binary"
+		return
+ 
+	# Default — return a data URL for inline display
+	import base64
+	b64 = base64.b64encode(png_bytes).decode("ascii")
+	return {
+		"venue":    venue,
+		"url":      target_url,
+		"data_url": f"data:image/png;base64,{b64}",
+		"size":     int(size),
+	}
 
 # ---------------------------------------------------------------
 # Existing APIs (unchanged — kept for compatibility)
