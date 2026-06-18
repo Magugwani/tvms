@@ -1,0 +1,190 @@
+{
+ "actions": [],
+ "autoname": "format:TVMS-AUD-{####}",
+ "creation": "2026-06-17 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "header_section",
+  "event_type",
+  "subject_type",
+  "column_break_1",
+  "timestamp",
+  "actor",
+  "subject_section",
+  "subject_name",
+  "subject_label",
+  "summary_section",
+  "summary",
+  "recipient",
+  "recipient_role",
+  "details_section",
+  "payload",
+  "linked_audit",
+  "context_section",
+  "ip_address",
+  "channel"
+ ],
+ "fields": [
+  {
+   "fieldname": "header_section",
+   "fieldtype": "Section Break",
+   "label": "Event"
+  },
+  {
+   "fieldname": "event_type",
+   "fieldtype": "Select",
+   "options": "SESSION_CREATED\nSESSION_CONFIRMED\nSESSION_CANCELLED\nSESSION_COMPLETED\nSESSION_EXPIRED\nSESSION_POSTPONED\nNOTIFICATION_SENT\nNOTIFICATION_READ\nNOTIFICATION_FORWARDED\nNOTIFICATION_FAILED\nVENUE_STATUS_CHANGED\nOTHER",
+   "label": "Event Type",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "subject_type",
+   "fieldtype": "Select",
+   "options": "Emergency session\nTvms Notifications\nVenue\nTimetable\nOther",
+   "label": "Subject Type",
+   "read_only": 1,
+   "in_standard_filter": 1,
+   "description": "Which kind of object this event relates to"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "timestamp",
+   "fieldtype": "Datetime",
+   "label": "When",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "actor",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Actor",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "User who performed the action (or 'System' for scheduler/auto events)"
+  },
+  {
+   "fieldname": "subject_section",
+   "fieldtype": "Section Break",
+   "label": "Subject"
+  },
+  {
+   "fieldname": "subject_name",
+   "fieldtype": "Data",
+   "label": "Subject Name",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "description": "Docname of the subject e.g. EMS-0042"
+  },
+  {
+   "fieldname": "subject_label",
+   "fieldtype": "Data",
+   "label": "Subject Label",
+   "read_only": 1,
+   "description": "Human-readable label cached at write time so deleted subjects remain identifiable"
+  },
+  {
+   "fieldname": "summary_section",
+   "fieldtype": "Section Break",
+   "label": "What Happened"
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Small Text",
+   "label": "Summary",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "recipient",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Recipient",
+   "read_only": 1,
+   "in_standard_filter": 1,
+   "description": "For NOTIFICATION_* events — the user who received the notification"
+  },
+  {
+   "fieldname": "recipient_role",
+   "fieldtype": "Select",
+   "options": "\nLecturer\nClass Representative (CR)\nStudent\nDepartment Admin\nSystem Manager",
+   "label": "Recipient Role",
+   "read_only": 1
+  },
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Details",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "payload",
+   "fieldtype": "Code",
+   "options": "JSON",
+   "label": "Payload",
+   "read_only": 1,
+   "description": "Structured event-specific data — e.g. {old_status, new_status} or {old_time, new_time}"
+  },
+  {
+   "fieldname": "linked_audit",
+   "fieldtype": "Link",
+   "options": "TVMS Audit Log",
+   "label": "Caused By",
+   "read_only": 1,
+   "description": "If this event was triggered by another logged event — links the chain. e.g. a NOTIFICATION_SENT row links back to the SESSION_CANCELLED that caused it."
+  },
+  {
+   "fieldname": "context_section",
+   "fieldtype": "Section Break",
+   "label": "Context",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.ip_address || doc.channel"
+  },
+  {
+   "fieldname": "ip_address",
+   "fieldtype": "Data",
+   "label": "IP Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "channel",
+   "fieldtype": "Select",
+   "options": "\nin-system\nemail\nsms\npush\nwebsocket",
+   "label": "Channel",
+   "read_only": 1,
+   "description": "For NOTIFICATION_* events — how the notification was delivered"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "is_submittable": 0,
+ "links": [],
+ "modified": "2026-06-17 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "TVMS Audit Log",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {"email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager", "share": 1},
+  {"email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "Administrator", "share": 1},
+  {"email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "Department Admin", "share": 1}
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "timestamp",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0,
+ "track_views": 0
+}

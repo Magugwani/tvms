@@ -6,6 +6,7 @@ from frappe.model.document import Document
 from frappe import _
 from frappe.utils import get_datetime, now_datetime, add_to_date, time_diff_in_hours, getdate, get_time
 from tvms.tvms.doctype.tvms_notifications.tvms_notifications import _create_tvms_notification
+from tvms.tvms.doctype.tvms_audit_log.tvms_audit_log import log_event
 
 
 class Emergencysession(Document):
@@ -48,11 +49,49 @@ class Emergencysession(Document):
 			or self.has_value_changed("end_time")
 		):
 			self._update_venue_status()
-
+ 
 		if self.has_value_changed("status"):
+			# Map status to audit event_type
+			event_type_map = {
+				"CONFIRMED": "SESSION_CONFIRMED",
+				"CANCELLED": "SESSION_CANCELLED",
+				"COMPLETED": "SESSION_COMPLETED",
+				"EXPIRED":   "SESSION_EXPIRED",
+				"PENDING":   "SESSION_CREATED",
+			}
+			event_type = event_type_map.get(self.status, "OTHER")
+ 
+			# Write the parent audit row FIRST so notifications can link back to it
+			parent_audit = log_event(
+				event_type=event_type,
+				summary=_("Session {0}: {1}").format(self.status, self.title),
+				subject_type="Emergency session",
+				subject_name=self.name,
+				subject_label=self.title or self.name,
+				payload={
+					"new_status": self.status,
+					"venue":      self.venue,
+					"course":     self.course,
+					"start_time": str(self.start_time)[:16] if self.start_time else None,
+					"end_time":   str(self.end_time)[:16] if self.end_time else None,
+				},
+			)
+ 
+			# Stash on flags so _send_status_notification / _notify_crs can link to it
+			self.flags.parent_audit = parent_audit
+ 
+			# Also still send the side-effect notifications + timeline comment
 			self._send_status_notification()
 			self._notify_crs()
-			self._log_action(_("Status changed to {0}").format(self.status))
+ 
+			# Lightweight timeline comment (no second audit write — we already wrote one)
+			frappe.get_doc({
+				"doctype": "Comment",
+				"comment_type": "Info",
+				"reference_doctype": self.doctype,
+				"reference_name": self.name,
+				"content": _("Status changed to {0}").format(self.status),
+			}).insert(ignore_permissions=True)
 
 	def after_insert(self):
 		self._update_venue_status()
@@ -359,6 +398,7 @@ class Emergencysession(Document):
 		msg = _("Session '{0}' (Venue: {1}, Course: {2}) is now {3}.").format(
 			self.title, self.venue or "N/A", self.course or "N/A", self.status
 		)
+		parent_audit = self.flags.get("parent_audit")
 		for recipient in self._get_notification_recipients():
 			frappe.publish_realtime(
 				"emergency_session_update",
@@ -374,12 +414,26 @@ class Emergencysession(Document):
 				reference_name=self.name,
 				channel="in-system",
 			)
+						# FR-40: log each notification delivery, link to the session action
+			log_event(
+				event_type="NOTIFICATION_SENT",
+				summary=_("Notification sent to {0}: session {1} is now {2}").format(
+					recipient, self.name, self.status
+				),
+				subject_type="Emergency session",
+				subject_name=self.name,
+				subject_label=self.title or self.name,
+				recipient=recipient,
+				channel="in-system",
+				linked_audit=parent_audit,
+			)
+ 
 
 	def _notify_crs(self):
-		"""FR-26: Notify all Class Representatives when a session status changes."""
+		"""FR-26 + FR-40: Notify all CRs AND log each delivery as part of the chain."""
 		if self.status not in ("PENDING", "CONFIRMED", "CANCELLED", "EXPIRED"):
 			return
-
+ 
 		crs = frappe.db.sql("""
 			SELECT DISTINCT u.name
 			FROM   `tabHas Role` hr
@@ -388,18 +442,19 @@ class Emergencysession(Document):
 			AND    u.enabled = 1
 			AND    u.name != %s
 		""", [self.created_by or "_none_"], as_dict=True)
-
+ 
 		if not crs:
 			return
-
+ 
 		data = {"session": self.name, "title": self.title, "status": self.status, "venue": self.venue}
 		msg  = _("Emergency session '{0}' (Course: {1}, Venue: {2}) changed to {3}.").format(
 			self.title, self.course or "N/A", self.venue or "N/A", self.status
 		)
-
+		parent_audit = self.flags.get("parent_audit")
+ 
 		for cr in crs:
 			frappe.publish_realtime(
-				"emergency_session_update", data, user=cr["name"], after_commit=True
+				"emergency_session_update", data, user=cr["name"], after_commit=True,
 			)
 			_create_tvms_notification(
 				title=_("Session {0}: {1}").format(self.status, self.title),
@@ -410,7 +465,17 @@ class Emergencysession(Document):
 				reference_name=self.name,
 				channel="in-system",
 			)
-
+			log_event(
+				event_type="NOTIFICATION_SENT",
+				summary=_("CR notified: session {0} is now {1}").format(self.name, self.status),
+				subject_type="Emergency session",
+				subject_name=self.name,
+				subject_label=self.title or self.name,
+				recipient=cr["name"],
+				recipient_role="Class Representative (CR)",
+				channel="in-system",
+				linked_audit=parent_audit,
+			)
 	def _is_email_enabled(self):
 		settings = self._get_tvms_settings()
 		return settings.get("email_enabled", True) if settings else frappe.conf.get("email_enabled", True)
@@ -491,8 +556,19 @@ class Emergencysession(Document):
 			self.comment or "N/A",
 		)
 
-	def _log_action(self, message):
-		"""FR-20: Append an audit entry to the document timeline"""
+	def _log_action(self, message, event_type="OTHER", payload=None, linked_audit=None):
+		"""FR-30: Append both a timeline Comment AND a structured audit row.
+ 
+		The Comment is consumed by Frappe's built-in timeline UI on the form.
+		The audit row is consumed by /app/tvms-audit and the subject API.
+ 
+		Args:
+		    message     -- human-readable summary (used for both)
+		    event_type  -- TVMS Audit Log event_type, e.g. SESSION_CONFIRMED
+		    payload     -- dict of structured event data
+		    linked_audit -- optional parent audit row name
+		"""
+		# Timeline comment — unchanged from before
 		frappe.get_doc({
 			"doctype": "Comment",
 			"comment_type": "Info",
@@ -500,7 +576,21 @@ class Emergencysession(Document):
 			"reference_name": self.name,
 			"content": message,
 		}).insert(ignore_permissions=True)
-
+ 
+		# Structured audit row
+		log_event(
+			event_type=event_type,
+			summary=message,
+			subject_type="Emergency session",
+			subject_name=self.name,
+			subject_label=self.title or self.name,
+			payload=payload,
+			linked_audit=linked_audit,
+		)
+		# Cache the audit name on flags so notification rows can link back to it
+		# inside the same on_update cycle.
+		audit_name = log_event.__wrapped__ if hasattr(log_event, "__wrapped__") else None
+		# Note: log_event returns the audit doc name. Capture it via the return
 
 # --- Module-level whitelisted APIs ---
 
