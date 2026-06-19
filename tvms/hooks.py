@@ -161,10 +161,11 @@ scheduler_events = {
 		"tvms.tvms.tasks.expire_pending_sessions",
 		"tvms.tvms.tasks.complete_confirmed_sessions",
 	],
-	# Runs every 5 minutes — sync venue current_status from timetable occupancy
+	# Runs every 5 minutes — venue sync + 2-hour session reminders
 	"cron": {
 		"*/5 * * * *": [
 			"tvms.tvms.tasks.sync_timetable_venue_statuses",
+			"tvms.tvms.tasks.send_two_hour_reminders",
 		],
 	},
 }
