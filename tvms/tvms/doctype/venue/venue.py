@@ -2,6 +2,9 @@
 # For license information, please see license.txt
 
 import frappe
+import io
+import base64
+import math
 from frappe.model.document import Document
 from frappe import _
 from frappe.utils import add_days, get_datetime, now_datetime, nowdate
@@ -44,6 +47,39 @@ class Venue(Document):
 		if self.capacity is not None and int(self.capacity) < 1:
 			frappe.throw(_("Capacity must be at least 1"))
 
+
+# Average walking speed used for distance → time estimation.
+# 1.4 m/s ≈ 5 km/h, the World Health Organization's reference
+# value for adult walking pace on flat ground.
+	_WALKING_SPEED_MPS = 1.4
+	def _haversine_meters(lat1, lon1, lat2, lon2):
+		"""Great-circle distance between two GPS points, in metres.
+	
+		Used for nearby-venue search and walking-time estimates.
+		Accurate to within a few metres at campus distances.
+		"""
+		R = 6371000  # Earth radius in metres
+		phi1 = math.radians(float(lat1))
+		phi2 = math.radians(float(lat2))
+		dphi = math.radians(float(lat2) - float(lat1))
+		dlambda = math.radians(float(lon2) - float(lon1))
+	
+		a = (math.sin(dphi / 2) ** 2
+			+ math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2)
+		c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+		return R * c
+	
+	
+	def _format_walking_time(distance_m):
+		"""Turn metres into a human-friendly "About 3 min walk" string."""
+		seconds = distance_m / _WALKING_SPEED_MPS
+		minutes = seconds / 60
+	
+		if minutes < 1:
+			return _("Less than 1 min walk")
+		if minutes < 2:
+			return _("About 1 min walk")
+		return _("About {0} min walk").format(int(round(minutes)))
 	# ---------------------------------------------------------------
 	# FR-11: Computed helpers
 	# ---------------------------------------------------------------
@@ -377,7 +413,198 @@ def get_venue_detail(venue: str):
 	}
 	return result
 
+#  ============================================================
+# FR-22 — Nearby venues for the public page
+# ============================================================
+ 
+@frappe.whitelist(methods=["GET"], allow_guest=True)
+def get_nearby_venues(venue: str, radius_m: int = 200, limit: int = 5):
+    """Return up to `limit` venues within `radius_m` of the given venue.
+ 
+    Used by the public /venue/<code> page to show "Other places nearby"
+    so a visitor can find adjacent buildings without manually searching.
+ 
+    Args:
+        venue    -- the centre venue (its lat/lng define the search origin)
+        radius_m -- search radius in metres (default 200, max 1000)
+        limit    -- max results (default 5, max 20)
+ 
+    Returns: list of dicts with venue_name, building_name, floor_label,
+             distance_m, walking_time, latitude, longitude. Sorted by
+             distance ascending. The origin venue itself is excluded.
+ 
+    Security note: marked allow_guest because it's consumed by the public
+    guest page. The fields returned are the same safe subset that
+    get_public_venue_navigation already exposes — no sensitive data.
+    """
+    if not venue or not frappe.db.exists("Venue", venue):
+        return []
+ 
+    radius_m = min(int(radius_m or 200), 1000)
+    limit    = min(int(limit or 5), 20)
+ 
+    origin = frappe.db.get_value(
+        "Venue", venue,
+        ["latitude", "longitude"],
+        as_dict=True,
+    )
+    if not origin or not origin.latitude or not origin.longitude:
+        return []
+ 
+    # Bounding-box prefilter — convert radius_m to lat/lng degrees
+    # and pull only candidates roughly in the box. This avoids a
+    # full-table scan when the venue list is large.
+    deg_per_metre_lat = 1.0 / 111000.0
+    deg_per_metre_lng = 1.0 / (111000.0 * max(0.01, math.cos(math.radians(origin.latitude))))
+ 
+    lat_delta = radius_m * deg_per_metre_lat
+    lng_delta = radius_m * deg_per_metre_lng
+ 
+    candidates = frappe.db.sql("""
+        SELECT name, venue_name, venue_type, building_name, floor_number,
+               latitude, longitude, capacity, current_status
+        FROM   `tabVenue`
+        WHERE  name != %(venue)s
+        AND    latitude  IS NOT NULL
+        AND    longitude IS NOT NULL
+        AND    latitude  BETWEEN %(min_lat)s AND %(max_lat)s
+        AND    longitude BETWEEN %(min_lng)s AND %(max_lng)s
+    """, {
+        "venue":   venue,
+        "min_lat": origin.latitude  - lat_delta,
+        "max_lat": origin.latitude  + lat_delta,
+        "min_lng": origin.longitude - lng_delta,
+        "max_lng": origin.longitude + lng_delta,
+    }, as_dict=True)
+ 
+    results = []
+    for c in candidates:
+        d = _haversine_meters(
+            origin.latitude, origin.longitude,
+            c["latitude"], c["longitude"],
+        )
+        if d > radius_m:
+            continue
+        results.append({
+            "name":          c["name"],
+            "venue_name":    c["venue_name"],
+            "venue_type":    c.get("venue_type") or "",
+            "building_name": c.get("building_name") or "",
+            "floor_label":   _floor_label(int(c.get("floor_number") or 0)),
+            "distance_m":    round(d),
+            "walking_time":  _format_walking_time(d),
+            "latitude":      c["latitude"],
+            "longitude":     c["longitude"],
+        })
+ 
+    results.sort(key=lambda x: x["distance_m"])
+    return results[:limit]
 
+
+# ============================================================
+# FR-22 — Walking distance estimate (used by public page hero)
+# ============================================================
+ 
+@frappe.whitelist(methods=["GET"], allow_guest=True)
+def estimate_walking_distance(from_lat: float, from_lng: float, to_venue: str):
+    """Estimate walking distance and time from a point to a venue.
+ 
+    The public page calls this when the visitor allows browser
+    geolocation, so they see "About 3 min walk" before tapping
+    "Get directions". Removes the surprise of "oh that's actually
+    a 15-minute walk across campus."
+ 
+    This is a straight-line haversine estimate — not actual routed
+    distance. Adequate for campus-scale navigation. For routed
+    distances we'd need Mapbox Directions API (paid per request).
+    """
+    if not to_venue or not frappe.db.exists("Venue", to_venue):
+        return {"error": "Venue not found"}
+ 
+    venue_loc = frappe.db.get_value(
+        "Venue", to_venue,
+        ["latitude", "longitude"],
+        as_dict=True,
+    )
+    if not venue_loc or not venue_loc.latitude or not venue_loc.longitude:
+        return {"error": "Venue has no GPS coordinates"}
+ 
+    try:
+        distance = _haversine_meters(
+            float(from_lat), float(from_lng),
+            venue_loc.latitude, venue_loc.longitude,
+        )
+    except (ValueError, TypeError):
+        return {"error": "Invalid coordinates"}
+ 
+    return {
+        "distance_m":   round(distance),
+        "walking_time": _format_walking_time(distance),
+    }
+
+
+# ============================================================
+# FR-24 — QR codes for door signs
+# ============================================================
+ 
+@frappe.whitelist(methods=["GET"])
+def get_venue_qr(venue: str, size: int = 256):
+    """Return a base64-encoded PNG QR code pointing to /venue/<code>.
+ 
+    Used by admins to print door stickers. Workflow:
+      1. Open Venue form → click "Print QR Sign" custom button
+      2. Frontend fetches this API
+      3. Renders the QR + venue name in a printable layout
+      4. Admin prints and sticks on the door
+ 
+    Visitors scan the QR → land at the public /venue/<code> page →
+    see building, floor, navigation notes, accessibility info, map.
+ 
+    Args:
+        venue -- the Venue docname
+        size  -- QR pixel size (box_size × modules), default 256
+ 
+    Returns:
+        {qr_png_base64, target_url, venue_name}
+    """
+    frappe.has_permission("Venue", "read", throw=True)
+ 
+    if not venue or not frappe.db.exists("Venue", venue):
+        frappe.throw(_("Venue not found"), frappe.DoesNotExistError)
+ 
+    # Construct the public URL — frappe.utils.get_url respects site_url
+    target_url = frappe.utils.get_url(f"/venue/{venue}")
+ 
+    # qrcode library is shipped with Frappe (used by Frappe for its own
+    # 2FA QR codes), so this is a zero-dependency import.
+    try:
+        import qrcode
+    except ImportError:
+        frappe.throw(_("QR code generation requires the qrcode library"))
+ 
+    qr = qrcode.QRCode(
+        version=None,                                       # auto-fit
+        error_correction=qrcode.constants.ERROR_CORRECT_M,  # ~15% redundancy
+        box_size=max(4, min(int(size) // 32, 32)),
+        border=2,
+    )
+    qr.add_data(target_url)
+    qr.make(fit=True)
+ 
+    img = qr.make_image(fill_color="#2c2c2a", back_color="#ffffff")
+ 
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    png_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+ 
+    venue_name = frappe.db.get_value("Venue", venue, "venue_name") or venue
+ 
+    return {
+        "qr_png_base64": f"data:image/png;base64,{png_b64}",
+        "target_url":    target_url,
+        "venue_name":    venue_name,
+        "venue_code":    venue,
+    }
 # ---------------------------------------------------------------
 # FR-19: New — venues with coordinates only (for map display)
 # ---------------------------------------------------------------

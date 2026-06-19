@@ -210,6 +210,100 @@
     padding: 20px;
     border-top: 1px solid #ececec;
   }
+    /* Action row — copy link + share */
+  .pp-action-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .pp-action-mini {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    color: #185FA5;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .pp-action-mini:hover { background: #f0f6fc; }
+  .pp-action-mini.pp-copied {
+    background: #DCF1E8;
+    color: #0F6E56;
+    border-color: #0F6E56;
+  }
+  .pp-action-mini-icon { font-size: 16px; }
+
+  /* Walking distance — updated dynamically when geolocation succeeds */
+  #pp-walking-distance.with-distance {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.95);
+  }
+
+  /* Nearby venues list */
+  .pp-nearby-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .pp-nearby-loading {
+    padding: 16px;
+    text-align: center;
+    color: #888780;
+    font-size: 13px;
+  }
+  .pp-nearby-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid #ececec;
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .pp-nearby-item:hover {
+    background: #fafafa;
+    border-color: #d3d1c7;
+    text-decoration: none;
+  }
+  .pp-nearby-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .pp-nearby-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #2c2c2a;
+    margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pp-nearby-meta {
+    font-size: 11px;
+    color: #888780;
+  }
+  .pp-nearby-distance {
+    font-size: 11px;
+    font-weight: 500;
+    color: #185FA5;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .pp-nearby-distance-m {
+    font-size: 10px;
+    color: #888780;
+    margin-top: 2px;
+  }
 
   /* Tablet+ */
   @media (min-width: 640px) {
@@ -249,13 +343,31 @@
        target="_blank" rel="noopener">
       <span class="pp-action-icon">🚶</span>
       <span class="pp-action-text">
-        {{ _("Walking directions") }}
-        <span class="pp-action-sub">{{ _("Opens in maps") }}</span>
+        <span class="pp-action-label">{{ _("Get walking directions") }}</span>
+        <span class="pp-action-sub" id="pp-walking-distance">{{ _("Opens in maps") }}</span>
       </span>
       <span class="pp-chevron">›</span>
     </a>
     {% endif %}
+
+    {# Secondary actions — copy link + native share #}
+    <div class="pp-action-row">
+      <button type="button" class="pp-action-mini" id="pp-copy-link"
+              data-url="{{ frappe.utils.get_url() }}/venue/{{ venue.name }}">
+        <span class="pp-action-mini-icon">🔗</span>
+        <span class="pp-action-mini-text" id="pp-copy-label">{{ _("Copy link") }}</span>
+      </button>
+
+      <button type="button" class="pp-action-mini" id="pp-share-btn"
+              data-name="{{ venue.venue_name }}"
+              data-url="{{ frappe.utils.get_url() }}/venue/{{ venue.name }}"
+              style="display: none;">
+        <span class="pp-action-mini-icon">📤</span>
+        <span class="pp-action-mini-text">{{ _("Share") }}</span>
+      </button>
+    </div>
   </div>
+
 
   {# ─── Building and floor info — FR-21/23 ──────────────────── #}
   <div class="pp-section" style="padding-top: 22px;">
@@ -311,6 +423,13 @@
     </div>
   </div>
   {% endif %}
+    {# ─── Nearby venues — FR-22 ─────────────────────────────── #}
+  <div class="pp-section" id="pp-nearby-section" style="display: none;">
+    <div class="pp-section-title">{{ _("Other places nearby") }}</div>
+    <div class="pp-nearby-list" id="pp-nearby-list">
+      <div class="pp-nearby-loading">{{ _("Loading nearby venues...") }}</div>
+    </div>
+  </div>
 
   {# ─── Resources ─────────────────────────────────────────── #}
   {% if venue.resources %}
@@ -369,3 +488,134 @@
 
 </div>
 {% endblock %}
+
+{% if venue %}
+<script>
+(function() {
+  const venueCode  = "{{ venue.name | tojson | safe }}".replace(/"/g, '');
+  const venueLat   = parseFloat("{{ venue.latitude }}");
+  const venueLng   = parseFloat("{{ venue.longitude }}");
+
+  // ─── COPY LINK BUTTON ──────────────────────────────────
+  const copyBtn   = document.getElementById('pp-copy-link');
+  const copyLabel = document.getElementById('pp-copy-label');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const url = copyBtn.dataset.url;
+      try {
+        await navigator.clipboard.writeText(url);
+        copyBtn.classList.add('pp-copied');
+        copyLabel.textContent = "{{ _('Link copied!') }}";
+        setTimeout(() => {
+          copyBtn.classList.remove('pp-copied');
+          copyLabel.textContent = "{{ _('Copy link') }}";
+        }, 2200);
+      } catch (e) {
+        // Fallback for older browsers
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        copyLabel.textContent = "{{ _('Link copied!') }}";
+        setTimeout(() => { copyLabel.textContent = "{{ _('Copy link') }}"; }, 2200);
+      }
+    });
+  }
+
+  // ─── WEB SHARE API (mobile native share sheet) ────────
+  const shareBtn = document.getElementById('pp-share-btn');
+  if (shareBtn && navigator.share) {
+    shareBtn.style.display = '';   // show it — browser supports sharing
+    shareBtn.addEventListener('click', async () => {
+      try {
+        await navigator.share({
+          title: shareBtn.dataset.name,
+          text:  "{{ _('Find this venue on campus') }}: " + shareBtn.dataset.name,
+          url:   shareBtn.dataset.url,
+        });
+      } catch (e) {
+        // User cancelled — no action
+      }
+    });
+  }
+
+  // ─── WALKING DISTANCE — uses geolocation if permitted ──
+  const distEl = document.getElementById('pp-walking-distance');
+  if (distEl && navigator.geolocation && venueLat && venueLng) {
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const r = await fetch(
+            "/api/method/tvms.tvms.doctype.venue.venue.estimate_walking_distance"
+            + "?from_lat=" + pos.coords.latitude
+            + "&from_lng=" + pos.coords.longitude
+            + "&to_venue=" + encodeURIComponent(venueCode)
+          );
+          const j = await r.json();
+          if (j.message && !j.message.error) {
+            distEl.textContent = j.message.walking_time + ' · '
+                               + j.message.distance_m + 'm';
+            distEl.classList.add('with-distance');
+          }
+        } catch (e) {
+          // Silent — just leave the default "Opens in maps" text
+        }
+      },
+      () => {
+        // User denied geolocation — no problem, just keep default text
+      },
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
+    );
+  }
+
+  // ─── NEARBY VENUES SECTION ─────────────────────────────
+  const nearbyList = document.getElementById('pp-nearby-list');
+  const nearbySection = document.getElementById('pp-nearby-section');
+  if (nearbyList && nearbySection) {
+    fetch(
+      "/api/method/tvms.tvms.doctype.venue.venue.get_nearby_venues"
+      + "?venue=" + encodeURIComponent(venueCode)
+      + "&radius_m=300&limit=5"
+    )
+      .then(r => r.json())
+      .then(j => {
+        const list = j.message || [];
+        if (!list.length) {
+          nearbySection.style.display = 'none';
+          return;
+        }
+        nearbySection.style.display = '';
+        nearbyList.innerHTML = list.map(v => `
+          <a class="pp-nearby-item" href="/venue/${encodeURIComponent(v.name)}">
+            <div class="pp-nearby-info">
+              <div class="pp-nearby-name">${escapeHtml(v.venue_name)}</div>
+              <div class="pp-nearby-meta">
+                ${escapeHtml(v.building_name || '')}${v.building_name && v.floor_label ? ' · ' : ''}${escapeHtml(v.floor_label || '')}
+              </div>
+            </div>
+            <div>
+              <div class="pp-nearby-distance">${escapeHtml(v.walking_time)}</div>
+              <div class="pp-nearby-distance-m">${v.distance_m}m</div>
+            </div>
+          </a>
+        `).join('');
+      })
+      .catch(() => {
+        nearbySection.style.display = 'none';
+      });
+  }
+
+  function escapeHtml(s) {
+    if (!s) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+})();
+</script>
+{% endif %}
