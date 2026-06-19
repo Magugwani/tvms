@@ -428,54 +428,204 @@ class Emergencysession(Document):
 				linked_audit=parent_audit,
 			)
  
-
 	def _notify_crs(self):
-		"""FR-26 + FR-40: Notify all CRs AND log each delivery as part of the chain."""
-		if self.status not in ("PENDING", "CONFIRMED", "CANCELLED", "EXPIRED"):
-			return
+		"""FR-26: Notify Class Representatives so they can forward to students.
+ 
+		FR-39: When is_critical=1, ALSO push directly to all enabled students
+		without waiting for the CR-forward step. Use case: a session cancelled
+		within 2 hours of start time — students need to know NOW, the
+		CR-forward chain (which depends on a CR being online to act) is too
+		slow.
+		"""
+		if self.status not in ("CANCELLED", "POSTPONED", "EXPIRED"):
+			# Confirmations and creations don't fire the critical-bypass —
+			# those aren't urgent enough to justify spamming students directly
+			# even when is_critical=1.
+			return self._notify_crs_standard()
+ 
+		if self.is_critical:
+			self._notify_crs_critical()
+		else:
+			self._notify_crs_standard()
+ 
+ 
+	def _notify_crs_standard(self):
+		"""Default path: notify CRs only. CRs forward to students per FR-28."""
+		from tvms.tvms.doctype.tvms_notifications.tvms_notifications import _create_tvms_notification
  
 		crs = frappe.db.sql("""
-			SELECT DISTINCT u.name
+			SELECT DISTINCT u.name, u.full_name
 			FROM   `tabHas Role` hr
 			INNER JOIN `tabUser` u ON hr.parent = u.name
 			WHERE  hr.role = 'Class Representative (CR)'
 			AND    u.enabled = 1
-			AND    u.name != %s
-		""", [self.created_by or "_none_"], as_dict=True)
+		""", as_dict=True)
  
-		if not crs:
-			return
- 
-		data = {"session": self.name, "title": self.title, "status": self.status, "venue": self.venue}
-		msg  = _("Emergency session '{0}' (Course: {1}, Venue: {2}) changed to {3}.").format(
-			self.title, self.course or "N/A", self.venue or "N/A", self.status
-		)
+		title = _("Session {0}: {1}").format(self.status, self.title)
+		message = self._compose_status_message()
 		parent_audit = self.flags.get("parent_audit")
  
 		for cr in crs:
-			frappe.publish_realtime(
-				"emergency_session_update", data, user=cr["name"], after_commit=True,
-			)
 			_create_tvms_notification(
-				title=_("Session {0}: {1}").format(self.status, self.title),
-				message=msg,
+				title=title,
+				message=message,
 				recipient=cr["name"],
-				recipient_role="Class Representative(CR)",
+				recipient_role="Class Representative (CR)",
 				reference_type="Emergency session",
 				reference_name=self.name,
 				channel="in-system",
 			)
+			frappe.publish_realtime(
+				"emergency_session_update",
+				{"session": self.name, "status": self.status, "title": self.title},
+				user=cr["name"],
+				after_commit=True,
+			)
+			# Push if available — silent no-op otherwise
+			self._try_push(cr["name"], title, message)
+ 
+ 
+	def _notify_crs_critical(self):
+		"""FR-39 critical path: notify CRs AND every enabled Student directly.
+ 
+		Sends BOTH:
+		  - in-system + realtime notifications (same as standard path)
+		  - email blast to students with the URGENT prefix
+		  - push notifications if FCM/APNs configured
+ 
+		Audit: each delivery is logged separately so the audit trail
+		clearly shows the critical bypass was used.
+		"""
+		from tvms.tvms.doctype.tvms_notifications.tvms_notifications import _create_tvms_notification
+		from tvms.tvms.doctype.tvms_audit_log.tvms_audit_log import log_event
+ 
+		recipients = frappe.db.sql("""
+			SELECT DISTINCT u.name, u.email,
+			       (CASE WHEN hr.role = 'Student' THEN 'Student'
+			             ELSE 'Class Representative (CR)' END) AS role
+			FROM   `tabHas Role` hr
+			INNER JOIN `tabUser` u ON hr.parent = u.name
+			WHERE  hr.role IN ('Class Representative (CR)', 'Student')
+			AND    u.enabled = 1
+		""", as_dict=True)
+ 
+		# Critical-prefixed title so notification UIs can style differently
+		title_base = self._compose_status_title()
+		title = _("⚠ URGENT: {0}").format(title_base)
+		message = self._compose_status_message(prefix=_("This is a CRITICAL notification — please read."))
+		parent_audit = self.flags.get("parent_audit")
+ 
+		# Audit one aggregate row for the critical bypass action
+		critical_audit = log_event(
+			event_type="NOTIFICATION_CRITICAL_BYPASS",
+			summary=f"Critical bypass: {self.name} notified {len(recipients)} users directly",
+			subject_type="Emergency session",
+			subject_name=self.name,
+			subject_label=self.title,
+			channel="critical",
+			linked_audit=parent_audit,
+			payload={
+				"reason":       self.status,
+				"recipients":   len(recipients),
+				"students":     len([r for r in recipients if r["role"] == "Student"]),
+				"crs":          len([r for r in recipients if r["role"] != "Student"]),
+			},
+		)
+ 
+		for r in recipients:
+			user = r["name"]
+ 
+			# In-system inbox
+			_create_tvms_notification(
+				title=title,
+				message=message,
+				recipient=user,
+				recipient_role=r["role"],
+				reference_type="Emergency session",
+				reference_name=self.name,
+				channel="in-system",
+			)
+ 
+			# Realtime push to Desk session if active
+			frappe.publish_realtime(
+				"emergency_session_critical",
+				{
+					"session":  self.name,
+					"status":   self.status,
+					"title":    self.title,
+					"critical": True,
+				},
+				user=user,
+				after_commit=True,
+			)
+ 
+			# Email blast — even if email_enabled is off, criticals get through
+			try:
+				frappe.sendmail(
+					recipients=[r.get("email") or user],
+					subject=title,
+					message=message,
+					delayed=False,
+				)
+			except Exception:
+				frappe.logger().warning(
+					f"[TVMS critical] email failed for {user}", exc_info=True,
+				)
+ 
+			# Push notification (best-effort)
+			self._try_push(user, title, message, critical=True)
+ 
+			# Per-recipient audit row, linked to the bypass action
 			log_event(
 				event_type="NOTIFICATION_SENT",
-				summary=_("CR notified: session {0} is now {1}").format(self.name, self.status),
+				summary=f"Critical → {user}",
 				subject_type="Emergency session",
 				subject_name=self.name,
-				subject_label=self.title or self.name,
-				recipient=cr["name"],
-				recipient_role="Class Representative (CR)",
-				channel="in-system",
-				linked_audit=parent_audit,
+				recipient=user,
+				recipient_role=r["role"],
+				channel="email",   # email + push + in-system happened
+				linked_audit=critical_audit,
 			)
+ 
+ 
+	def _compose_status_title(self):
+		"""Title used by both standard and critical paths."""
+		return _("Session {0}: {1}").format(self.status, self.title)
+ 
+ 
+	def _compose_status_message(self, prefix=None):
+		"""Body used by both standard and critical paths."""
+		venue_label  = self.venue or _("N/A")
+		course_label = self.course or _("N/A")
+		start_label  = str(self.start_time)[:16] if self.start_time else _("N/A")
+ 
+		message = _(
+			"Emergency session <strong>{0}</strong> "
+			"(Course: {1}, Venue: {2}, Start: {3}) is now {4}."
+		).format(self.title, course_label, venue_label, start_label, self.status)
+ 
+		if prefix:
+			return f"<p><strong>{frappe.utils.escape_html(prefix)}</strong></p>{message}"
+ 
+		return message
+ 
+ 
+	def _try_push(self, user, title, message, critical=False):
+		"""Best-effort push notification. Silent no-op if push isn't set up."""
+		try:
+			from tvms.tvms.api.push_notifications import send_push_to_user
+			send_push_to_user(
+				user, title, message,
+				data={
+					"type":     "session_update",
+					"session":  self.name,
+					"status":   self.status,
+					"critical": critical,
+				},
+			)
+		except Exception:
+			# Push is optional infrastructure — never break the notification flow
+			pass
 	def _is_email_enabled(self):
 		settings = self._get_tvms_settings()
 		return settings.get("email_enabled", True) if settings else frappe.conf.get("email_enabled", True)

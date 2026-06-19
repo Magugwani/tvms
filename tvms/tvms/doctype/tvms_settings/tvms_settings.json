@@ -16,6 +16,9 @@
   "sms_api_url",
   "sms_api_key",
   "sms_sender_id",
+  "fcm_server_key",
+  "fcm_project_id",
+  "mapbox_token",
   "column_break_8",
   "email_settings_section",
   "email_enabled",
@@ -115,6 +118,35 @@
    "fieldname": "email_from",
    "fieldtype": "Data",
    "label": "Email From Address"
+  },
+  {
+    "fieldname": "section_push",
+    "fieldtype": "Section Break",
+    "label": "Push Notifications (FR-41)",
+    "collapsible": 1
+  },
+  {
+    "fieldname": "push_enabled",
+    "fieldtype": "Check",
+    "label": "Push Notifications Enabled",
+    "default": "0",
+    "description": "When checked AND a FCM server key is set, push notifications will be sent to registered mobile devices in addition to in-app and email."
+  },
+  {
+    "fieldname": "fcm_server_key",
+    "fieldtype": "Password",
+    "label": "FCM Server Key",
+    "description": "Firebase Cloud Messaging server key. Get this from your Firebase Console → Project Settings → Cloud Messaging. Used for BOTH Android and iOS (FCM relays to APNs internally)."
+  },
+  {
+    "fieldname": "column_break_push",
+    "fieldtype": "Column Break"
+  },
+  {
+    "fieldname": "fcm_project_id",
+    "fieldtype": "Data",
+    "label": "Firebase Project ID",
+    "description": "Optional. Your Firebase project ID (e.g. 'tvms-tanzania'). Used for documentation and future HTTP v1 API migration."
   }
  ],
  "grid_page_length": 50,

@@ -4,6 +4,8 @@
 import frappe
 import io
 import base64
+import json as _json
+from frappe.utils.pdf import get_pdf
 import math
 from frappe.model.document import Document
 from frappe import _
@@ -1142,3 +1144,277 @@ def get_venue_status_history(venue: str, limit: int = 50):
 		"total":   frappe.db.count("Venue Status History", {"parent": venue}),
 		"history": rows,
 	}
+
+# ============================================================
+#  — BULK QR STICKER GENERATOR
+# ============================================================
+#
+ 
+# Layout specs: (cols, rows, label_width_mm, label_height_mm, qr_size_px)
+_BULK_LAYOUTS = {
+	"2up": (1, 2, 180, 130, 360),
+	"4up": (2, 2,  90, 130, 280),
+	"8up": (2, 4,  90,  65, 200),
+}
+ 
+ 
+@frappe.whitelist(methods=["POST"])
+def bulk_print_venue_qr(venue_codes, layout: str = "4up"):
+	"""Generate a single PDF containing QR stickers for many venues.
+ 
+	Used by admins printing door signs in batches. Workflow:
+	  1. Venue list view → multi-select venues → "Bulk QR" action
+	  2. Choose layout (2up / 4up / 8up)
+	  3. Browser downloads the PDF
+	  4. Admin prints on A4 paper, then cuts along guide lines
+ 
+	Args:
+	    venue_codes -- list of Venue docnames OR a JSON-encoded list
+	                   (Frappe sends arrays as JSON strings via form-data)
+	    layout      -- one of "2up", "4up" (default), "8up"
+ 
+	Returns: streams a PDF file via frappe.local.response.
+ 
+	Performance: each QR is ~5-10ms to generate. A 100-venue batch
+	takes ~1 second. Larger batches stay reasonable up to ~500.
+	"""
+	frappe.has_permission("Venue", "read", throw=True)
+ 
+	# Frappe form_dict serialises arrays as JSON strings
+	if isinstance(venue_codes, str):
+		try:
+			venue_codes = _json.loads(venue_codes)
+		except (ValueError, TypeError):
+			frappe.throw(_("venue_codes must be a list of venue names"))
+ 
+	if not venue_codes:
+		frappe.throw(_("Pick at least one venue"))
+ 
+	if layout not in _BULK_LAYOUTS:
+		layout = "4up"
+ 
+	cols, rows, label_w_mm, label_h_mm, qr_px = _BULK_LAYOUTS[layout]
+	per_page = cols * rows
+ 
+	# Build the per-venue cards in one pass, then chunk by per_page
+	try:
+		import qrcode
+	except ImportError:
+		frappe.throw(_("QR code generation requires the qrcode library"))
+ 
+	cards_html = []
+	skipped = []
+ 
+	for code in venue_codes:
+		if not frappe.db.exists("Venue", code):
+			skipped.append(code)
+			continue
+ 
+		venue_name = frappe.db.get_value("Venue", code, "venue_name") or code
+		building   = frappe.db.get_value("Venue", code, "building_name") or ""
+		target_url = frappe.utils.get_url(f"/venue/{code}")
+ 
+		# Generate QR PNG inline as base64
+		qr = qrcode.QRCode(
+			version=None,
+			error_correction=qrcode.constants.ERROR_CORRECT_M,
+			box_size=max(3, min(qr_px // 32, 16)),
+			border=2,
+		)
+		qr.add_data(target_url)
+		qr.make(fit=True)
+		img = qr.make_image(fill_color="#2c2c2a", back_color="#ffffff")
+ 
+		buf = io.BytesIO()
+		img.save(buf, format="PNG")
+		png_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+ 
+		cards_html.append(_render_card(
+			venue_name=venue_name,
+			venue_code=code,
+			building=building,
+			target_url=target_url,
+			qr_data=f"data:image/png;base64,{png_b64}",
+			layout=layout,
+		))
+ 
+	if not cards_html:
+		frappe.throw(_("None of the venues you selected exist anymore"))
+ 
+	# Chunk into pages
+	pages_html = []
+	for i in range(0, len(cards_html), per_page):
+		page_cards = cards_html[i:i + per_page]
+		# Pad final page so cells stay aligned even when not full
+		while len(page_cards) < per_page:
+			page_cards.append('<div class="card empty"></div>')
+		pages_html.append(_render_page(page_cards, cols, rows, layout))
+ 
+	html_doc = _render_document(
+		title=_("Venue QR Stickers"),
+		pages_html="".join(pages_html),
+		layout=layout,
+		cols=cols, rows=rows,
+		label_w_mm=label_w_mm, label_h_mm=label_h_mm,
+	)
+ 
+	pdf_bytes = get_pdf(html_doc, {
+		"page-size":     "A4",
+		"margin-top":    "8mm",
+		"margin-bottom": "8mm",
+		"margin-left":   "8mm",
+		"margin-right":  "8mm",
+		"encoding":      "UTF-8",
+	})
+ 
+	filename = f"venue_qr_stickers_{layout}_{frappe.utils.nowdate()}.pdf"
+	frappe.local.response.filename     = filename
+	frappe.local.response.filecontent  = pdf_bytes
+	frappe.local.response.type         = "pdf"
+ 
+	# Frappe's response object swallows the return — anything we put here
+	# only matters if response.type isn't binary. Leave as a sanity log:
+	return {"generated": len(cards_html), "skipped": skipped, "layout": layout}
+ 
+ 
+def _render_card(venue_name, venue_code, building, target_url, qr_data, layout):
+	"""HTML for one sticker. Size hints scale via the layout class."""
+	name_html  = frappe.utils.escape_html(venue_name)
+	code_html  = frappe.utils.escape_html(venue_code)
+	bldg_html  = frappe.utils.escape_html(building) if building else ""
+	url_html   = frappe.utils.escape_html(target_url)
+ 
+	bldg_block = f'<div class="card-bldg">{bldg_html}</div>' if bldg_html else ""
+ 
+	# 8up gets a tighter layout, no URL printed
+	url_block = "" if layout == "8up" else f'<div class="card-url">{url_html}</div>'
+ 
+	return f"""
+		<div class="card card-{layout}">
+			<div class="card-content">
+				<div class="card-name">{name_html}</div>
+				<div class="card-code">{code_html}</div>
+				{bldg_block}
+				<img class="card-qr" src="{qr_data}">
+				<div class="card-instruction">{_('Scan with phone camera for directions')}</div>
+				{url_block}
+			</div>
+		</div>
+	"""
+ 
+ 
+def _render_page(cards_html, cols, rows, layout):
+	"""Wrap cards in a single page-break-after div."""
+	return f"""
+		<div class="page page-{layout}">
+			{"".join(cards_html)}
+		</div>
+	"""
+ 
+ 
+def _render_document(title, pages_html, layout, cols, rows, label_w_mm, label_h_mm):
+	"""Full HTML doc with CSS sized for the chosen layout."""
+ 
+	# Per-layout font sizing
+	if layout == "2up":
+		name_size = "20pt"; code_size = "11pt"; instr_size = "9pt"; url_size = "7pt"; qr_max = "55mm"
+	elif layout == "4up":
+		name_size = "14pt"; code_size = "9pt"; instr_size = "7.5pt"; url_size = "6pt"; qr_max = "42mm"
+	else:  # 8up
+		name_size = "11pt"; code_size = "7.5pt"; instr_size = "6.5pt"; url_size = "6pt"; qr_max = "28mm"
+ 
+	return f"""
+		<!DOCTYPE html>
+		<html>
+		<head>
+			<meta charset="utf-8">
+			<title>{frappe.utils.escape_html(title)}</title>
+			<style>
+				@page {{
+					size: A4;
+					margin: 8mm;
+				}}
+				* {{ box-sizing: border-box; }}
+				body {{
+					font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+					margin: 0;
+					padding: 0;
+					color: #2c2c2a;
+				}}
+				.page {{
+					display: grid;
+					grid-template-columns: repeat({cols}, 1fr);
+					grid-template-rows: repeat({rows}, 1fr);
+					gap: 2mm;
+					page-break-after: always;
+					width: 100%;
+					height: 277mm;   /* A4 height - margins */
+				}}
+				.page:last-child {{
+					page-break-after: auto;
+				}}
+				.card {{
+					border: 1.5px dashed #888780;
+					border-radius: 4mm;
+					padding: 3mm 4mm;
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+					justify-content: center;
+					text-align: center;
+					overflow: hidden;
+				}}
+				.card.empty {{
+					border: 1px dotted #d3d1c7;
+					opacity: 0.3;
+				}}
+				.card-content {{
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+					justify-content: center;
+					gap: 1.5mm;
+					width: 100%;
+				}}
+				.card-name {{
+					font-size: {name_size};
+					font-weight: 600;
+					line-height: 1.1;
+					margin: 0;
+				}}
+				.card-code {{
+					font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+					font-size: {code_size};
+					color: #888780;
+					letter-spacing: 0.05em;
+				}}
+				.card-bldg {{
+					font-size: {code_size};
+					color: #5F5E5A;
+					margin-top: -1mm;
+				}}
+				.card-qr {{
+					max-width: {qr_max};
+					max-height: {qr_max};
+					margin: 1mm 0;
+				}}
+				.card-instruction {{
+					font-size: {instr_size};
+					color: #5F5E5A;
+					line-height: 1.3;
+				}}
+				.card-url {{
+					font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+					font-size: {url_size};
+					color: #888780;
+					word-break: break-all;
+					max-width: 100%;
+					margin-top: 1mm;
+				}}
+			</style>
+		</head>
+		<body>
+			{pages_html}
+		</body>
+		</html>
+	"""
