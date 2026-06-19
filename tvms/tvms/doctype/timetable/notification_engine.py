@@ -17,7 +17,9 @@
 # (the existing in-system inbox) and log_event (the audit log).
 # Email and SMS are sent only for high-impact changes (cancellation,
 # new class), not minor edits — controlled via the URGENCY map.
-
+ 
+from tvms.tvms.doctype.tvms_notification_preference.tvms_notification_preference \
+    import should_deliver
 import frappe
 from frappe import _
 from frappe.utils import now
@@ -493,6 +495,127 @@ def _dispatch_aggregate(event_type, recipient, recipient_role, title, message, p
 		_send_email(recipient, title, message, timetable_doc=None)
 
 
+# notification dispatch helpers — send to one recipient, respecting their preferences
+def _send_to_recipient(
+    recipient: str,
+    title: str,
+    message: str,
+    reference_type: str,
+    reference_name: str,
+    channel: str = "in-system",
+    realtime_event: str = "tvms_notification",
+    realtime_data: dict = None,
+    audit_subject_type: str = None,
+    audit_subject_name: str = None,
+    audit_subject_label: str = None,
+    audit_event_type: str = "NOTIFICATION_SENT",
+    audit_parent: str = None,
+    event_type: str = None,           # NEW — for preference matching
+    is_critical: bool = False,        # NEW — for critical bypass
+):
+    """Send notification to one recipient, respecting their preferences.
+ 
+    Channels are attempted independently. Each one checks should_deliver()
+    first; if the user has that channel off (or has the event_type muted,
+    or is in quiet hours), the channel is skipped silently.
+ 
+    Critical notifications (is_critical=True) bypass event_type and
+    optionally quiet_hours, controlled per-user.
+    """
+    try:
+        # ── In-app channel — always delivers ──────────────────────
+        if should_deliver(recipient, "in-system", event_type, is_critical):
+            _create_tvms_notification(
+                title=title,
+                message=message,
+                recipient=recipient,
+                reference_type=reference_type,
+                reference_name=reference_name,
+                channel="in-system",
+            )
+            log_event(
+                event_type=audit_event_type,
+                summary=f"{title} → {recipient} (in-system)",
+                subject_type=audit_subject_type or reference_type,
+                subject_name=audit_subject_name or reference_name,
+                subject_label=audit_subject_label,
+                recipient=recipient,
+                channel="in-system",
+                linked_audit=audit_parent,
+            )
+ 
+        # ── Realtime / WebSocket ──────────────────────────────────
+        if should_deliver(recipient, "realtime", event_type, is_critical):
+            if realtime_data is None:
+                realtime_data = {"title": title, "message": message}
+            frappe.publish_realtime(
+                realtime_event, realtime_data,
+                user=recipient, after_commit=True,
+            )
+ 
+        # ── Push (FCM) ────────────────────────────────────────────
+        if should_deliver(recipient, "push", event_type, is_critical):
+            try:
+                from tvms.tvms.api.push_notifications import send_push_to_user
+                send_push_to_user(
+                    user=recipient,
+                    title=title,
+                    body=message,
+                    data={
+                        "type": event_type or "",
+                        "reference_type": reference_type or "",
+                        "reference_name": reference_name or "",
+                    },
+                )
+                log_event(
+                    event_type=audit_event_type,
+                    summary=f"{title} → {recipient} (push)",
+                    subject_type=audit_subject_type or reference_type,
+                    subject_name=audit_subject_name or reference_name,
+                    subject_label=audit_subject_label,
+                    recipient=recipient,
+                    channel="push",
+                    linked_audit=audit_parent,
+                )
+            except Exception:
+                frappe.logger().warning(
+                    f"[FR-41] push send failed for {recipient}",
+                    exc_info=True,
+                )
+ 
+        # ── Email (only if channel explicitly requested) ──────────
+        # Caller passes channel="email" only for high-urgency events.
+        # We still check the user's email toggle.
+        if channel == "email" and should_deliver(recipient, "email", event_type, is_critical):
+            try:
+                frappe.sendmail(
+                    recipients=[recipient],
+                    subject=title,
+                    message=f"<p>{message}</p>",
+                    delayed=False,
+                )
+                log_event(
+                    event_type=audit_event_type,
+                    summary=f"{title} → {recipient} (email)",
+                    subject_type=audit_subject_type or reference_type,
+                    subject_name=audit_subject_name or reference_name,
+                    subject_label=audit_subject_label,
+                    recipient=recipient,
+                    channel="email",
+                    linked_audit=audit_parent,
+                )
+            except Exception:
+                frappe.logger().warning(
+                    f"[FR-42] email send failed for {recipient}",
+                    exc_info=True,
+                )
+ 
+    except Exception:
+        frappe.logger().warning(
+            f"[FR-42] notification dispatch failed for {recipient}",
+            exc_info=True,
+        )
+ 
 def _send_email(recipient, title, message, timetable_doc):
 	"""Fire-and-forget email. Frappe's mail queue handles retries."""
 	try:
