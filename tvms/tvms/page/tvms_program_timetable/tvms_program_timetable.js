@@ -88,6 +88,236 @@ class TVMSProgramTimetable {
 				display: flex; align-items: center; gap: 6px; font-size: 13px;
 				margin-bottom: 0; padding-bottom: 6px;
 			}
+			.tvms-pt-page-banner {
+				background: #fff;
+				border-bottom: 2px solid var(--border-color);
+				padding: 16px 20px;
+				margin-bottom: 20px;
+				position: sticky;
+				top: 0;
+				z-index: 10;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 16px;
+			}
+
+			.tvms-pt-institutional {
+				flex: 1;
+			}
+
+			.tvms-pt-institution-name {
+				font-size: 14px;
+				font-weight: 700;
+				color: #1a1a1a;
+				letter-spacing: 0.05em;
+				text-align: center;
+			}
+
+			.tvms-pt-my-jump {
+				white-space: nowrap;
+			}
+
+			.tvms-pt-title-block {
+				text-align: center;
+				padding: 16px 12px 12px;
+				background: linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%);
+				border-bottom: 1px solid var(--border-color);
+				margin-bottom: 0;
+			}
+
+			.tvms-pt-title-line1 {
+				font-size: 13px;
+				font-weight: 700;
+				letter-spacing: 0.08em;
+				color: #1a1a1a;
+				margin-bottom: 6px;
+			}
+
+			.tvms-pt-title-line2 {
+				font-size: 14px;
+				font-weight: 700;
+				color: #1976d2;
+				letter-spacing: 0.05em;
+				margin-bottom: 4px;
+			}
+
+			.tvms-pt-title-line3 {
+				font-size: 12px;
+				font-weight: 600;
+				color: #555;
+				letter-spacing: 0.1em;
+			}
+
+			.tvms-pt-group {
+				border: 1px solid var(--border-color);
+				border-radius: 6px;
+				margin-bottom: 24px;
+				background: #fff;
+				overflow: hidden;
+				scroll-margin-top: 80px;
+			}
+
+			.tvms-pt-group.tvms-pt-mine {
+				border: 2px solid #1976d2;
+				box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.1);
+			}
+
+			.tvms-pt-group.tvms-pt-highlight {
+				animation: tvms-pt-pulse 2.5s ease-out;
+			}
+
+			@keyframes tvms-pt-pulse {
+				0%   { box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.4); }
+				50%  { box-shadow: 0 0 0 12px rgba(25, 118, 210, 0); }
+				100% { box-shadow: 0 0 0 0 rgba(25, 118, 210, 0); }
+			}
+
+			.tvms-pt-group-meta {
+				padding: 10px 16px;
+				background: #fafafa;
+				border-bottom: 1px solid var(--border-color);
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 12px;
+				font-size: 12px;
+				color: #666;
+			}
+
+			.tvms-pt-mine-badge {
+				display: inline-block;
+				padding: 3px 10px;
+				background: #1976d2;
+				color: #fff;
+				border-radius: 12px;
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+				margin-right: auto;
+				margin-left: 8px;
+			}
+			.tvms-pt-grid-head.tvms-pt-day-head {
+				background: var(--fg-color);
+				color: var(--text-color);
+				font-weight: 600;
+				text-align: center;
+				padding: 8px 4px;
+				border-right: 1px solid var(--border-color);
+				border-bottom: 2px solid var(--border-color);
+				position: sticky;
+				left: 0;
+				z-index: 2;
+			}
+			
+			.tvms-pt-grid-head.tvms-pt-time-head {
+				background: var(--bg-light-gray);
+				font-weight: 600;
+				text-align: center;
+				padding: 8px 4px;
+				border-right: 1px solid var(--border-color);
+				border-bottom: 2px solid var(--border-color);
+				font-size: 10px;
+				white-space: nowrap;
+			}
+			
+			.tvms-pt-day-label {
+				background: var(--bg-light-gray);
+				font-weight: 600;
+				text-align: center;
+				padding: 12px 8px;
+				border-right: 2px solid var(--border-color);
+				border-bottom: 1px solid var(--border-color);
+				position: sticky;
+				left: 0;
+				z-index: 1;
+			}
+			
+			.tvms-pt-empty-cell {
+				background: #fff;
+				color: #c0c0c0;
+				text-align: center;
+				padding: 10px 4px;
+				border-right: 1px solid var(--border-color);
+				border-bottom: 1px solid var(--border-color);
+				font-size: 11px;
+			}
+			
+			.tvms-pt-empty-cell.tvms-pt-closed {
+				background: #f5f5f5;
+				color: #999;
+			}
+			
+			.tvms-pt-session-cell {
+				background: #fff;
+				border-right: 1px solid var(--border-color);
+				border-bottom: 1px solid var(--border-color);
+				padding: 6px;
+				overflow: hidden;
+			}
+			
+			.tvms-pt-card-course {
+				font-weight: 600;
+				font-size: 11px;
+				line-height: 1.3;
+				margin-bottom: 4px;
+				color: #1976d2;
+			}
+			
+			.tvms-pt-card-lecturer {
+				font-size: 10px;
+				color: #555;
+				line-height: 1.3;
+				margin-bottom: 3px;
+				text-transform: uppercase;
+				letter-spacing: 0.02em;
+			}
+			
+			.tvms-pt-card-venue {
+				font-size: 10px;
+				color: #777;
+				line-height: 1.3;
+			}
+			
+			.tvms-pt-card-students {
+				font-size: 10px;
+				color: #999;
+				line-height: 1.3;
+				font-style: italic;
+				margin-top: 2px;
+			}
+			
+			.tvms-pt-status-dot {
+				display: inline-block;
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: #4caf50;
+				margin-right: 4px;
+			}
+			
+			.tvms-pt-status-dot.in-use { background: #f44336; }
+			.tvms-pt-status-dot.booked { background: #ff9800; }
+			
+			.tvms-pt-card.is-draft {
+				background: #fff8e1;
+				border-left: 3px solid #ffa726;
+			}
+			
+			.tvms-pt-publish-status {
+				display: inline-block;
+				font-size: 9px;
+				padding: 1px 4px;
+				border-radius: 2px;
+				margin-left: 4px;
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+				vertical-align: middle;
+			}
+			
+			.tvms-pt-publish-status.draft { background: #ffa726; color: #fff; }
+			.tvms-pt-publish-status.published { background: #66bb6a; color: #fff; }
 			.tvms-pt-summary {
 				font-size: 12px; color: var(--text-muted); margin-bottom: 18px;
 			}
@@ -205,11 +435,31 @@ class TVMSProgramTimetable {
 			: { week_start: this.week_start };
 
 		const data = await frappe.xcall(method, args);
-
 		// Refresh publish status banner (admins only)
 		if (this.is_admin) {
 			this._refresh_publish_banner();
 		}
+		const header = await frappe.xcall(
+			"tvms.tvms.doctype.timetable.timetable.get_institutional_header"
+		);
+		this.institutional_header = header || {};
+
+		try {
+			this.my_segment = await frappe.xcall(
+				"tvms.tvms.doctype.timetable.timetable.get_my_program_segment"
+			);
+		} catch (e) {
+			this.my_segment = {};
+		}
+				const data = await frappe.xcall(
+			"tvms.tvms.doctype.timetable.timetable.get_program_timetable_groups",
+			{
+				week_start: this.week_start,
+				include_weekends: this.include_weekends ? 1 : 0,
+				program: this.filter_program || null,
+				year_level: this.filter_year || null,
+			}
+		);
 
 		this.render(data);
 	}
@@ -263,6 +513,11 @@ class TVMSProgramTimetable {
 
 	render(data) {
 		const groups = data.groups || [];
+				// render institutional banner above everything
+		this._render_institutional_banner();
+
+		// render my-program jump button if user has a known segment
+		this._render_my_segment_jump();
 
 		this.$body.find(".tvms-pt-summary").text(
 			__("Week of {0} — {1} program/year segment(s)", [data.week_start, groups.length])
@@ -297,73 +552,216 @@ class TVMSProgramTimetable {
 				self._open_add_class_dialog({ program, year_level });
 			});
 		}
+		if (!groups.length) {
+			this.$body.find(".tvms-pt-groups").html(`
+				<div class="tvms-pt-empty">
+					${__("No timetable entries match the current filters.")}
+				</div>
+			`);
+			return;
+		}
+
+		const $groups = this.$body.find(".tvms-pt-groups").empty();
+		groups.forEach((group) => $groups.append(this.render_group(group)));
+	}
+		_render_institutional_banner() {
+		const h = this.institutional_header || {};
+		if (!h.institution) return;
+
+		// Build the page-top banner. We render it once at the top of
+		// the layout, not inside .tvms-pt-groups (which gets rebuilt
+		// on every refresh).
+		let $banner = this.wrapper.find(".tvms-pt-page-banner");
+		if (!$banner.length) {
+			$banner = $(`<div class="tvms-pt-page-banner"></div>`);
+			this.$body.prepend($banner);
+		}
+
+		const sem_text = h.semester
+			? `${h.semester}${h.academic_year ? ` (${h.academic_year})` : ""}`
+			: "";
+
+		$banner.html(`
+			<div class="tvms-pt-institutional">
+				<div class="tvms-pt-institution-name">
+					${frappe.utils.escape_html(h.institution)}${sem_text ? `&nbsp;&nbsp;-&nbsp;&nbsp;${frappe.utils.escape_html(sem_text)}` : ""}
+				</div>
+			</div>
+		`);
+	}
+		_render_my_segment_jump() {
+		const seg = this.my_segment || {};
+		if (!seg.program) return;
+
+		// Build a "Jump to my timetable" button in the page toolbar
+		let $btn = this.wrapper.find(".tvms-pt-my-jump");
+		if (!$btn.length) {
+			$btn = $(`
+				<button class="btn btn-sm btn-primary tvms-pt-my-jump">
+					<i class="ti ti-arrow-down"></i>
+					${__("Jump to My Timetable")}
+				</button>
+			`);
+			this.wrapper.find(".tvms-pt-page-banner").append($btn);
+		}
+
+		$btn.off("click").on("click", () => {
+			const key = `${seg.program}||${seg.year_level}`;
+			const $target = this.wrapper.find(`.tvms-pt-group[data-key="${key}"]`);
+			if ($target.length) {
+				// Smooth scroll, then briefly highlight
+				$target[0].scrollIntoView({ behavior: "smooth", block: "start" });
+				$target.addClass("tvms-pt-highlight");
+				setTimeout(() => $target.removeClass("tvms-pt-highlight"), 2500);
+			}
+		});
 	}
 
 	// One group = one "Program - Year" section with its own weekly grid
 	render_group(group) {
 		const sessions = group.sessions || [];
 		const days = this.get_days();
-		const slots = this.get_slots(sessions);
+		const time_slots = this.get_hourly_slots();   // 07:00 → 21:00 fixed
+ 
+				//  build the printed-format title block
+		const title_block = this._build_title_block(group);
+
+		// Highlight if this is the user's own program segment
+		const is_mine = this.my_segment &&
+			this.my_segment.program === group.program &&
+			this.my_segment.year_level === group.year_level;
+		const mine_class = is_mine ? " tvms-pt-mine" : "";
 
 		const $section = $(`
-			<div class="tvms-pt-group">
-				<div class="tvms-pt-group-header">
-					<h3 class="tvms-pt-group-title">${frappe.utils.escape_html(group.label)}</h3>
-					<div class="tvms-pt-group-meta">
-						${sessions.length} ${__("session(s)")}
-						${this.is_admin ? `
-							<button class="btn btn-default tvms-pt-add-row-btn"
-								data-program="${frappe.utils.escape_html(group.program || "")}"
-								data-year-level="${frappe.utils.escape_html(group.year_level || "")}">
-								+ ${__("Add Class")}
-							</button>` : ""}
-					</div>
+			<div class="tvms-pt-group${mine_class}" data-key="${frappe.utils.escape_html(group.key)}">
+				${title_block}
+				<div class="tvms-pt-group-meta">
+					${sessions.length} ${__("session(s)")}
+					${is_mine ? `<span class="tvms-pt-mine-badge">${__("Your timetable")}</span>` : ""}
+					${this.is_admin ? `
+						<button class="btn btn-default tvms-pt-add-row-btn"
+							data-program="${frappe.utils.escape_html(group.program || "")}"
+							data-year-level="${frappe.utils.escape_html(group.year_level || "")}">
+							+ ${__("Add Class")}
+						</button>` : ""}
 				</div>
 				<div class="tvms-pt-grid-wrap"></div>
 			</div>
 		`);
-
+ 
 		const $wrap = $section.find(".tvms-pt-grid-wrap");
-
-		if (!sessions.length) {
-			$wrap.html(`<div class="tvms-pt-empty">${__("No sessions scheduled for this segment.")}</div>`);
-			return $section;
-		}
-
-		const by_cell = {};
+ 
+		// Build a lookup: day → array of sessions for that day, sorted by start_time
+		const by_day = {};
+		days.forEach((d) => { by_day[d] = []; });
 		sessions.forEach((s) => {
-			const key = `${s.day_of_week}__${s.start_time}`;
-			if (!by_cell[key]) by_cell[key] = [];
-			by_cell[key].push(s);
+			if (by_day[s.day_of_week]) by_day[s.day_of_week].push(s);
+		});
+		Object.keys(by_day).forEach((d) => {
+			by_day[d].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
 		});
 
-		const columns = days.length + 1;
 		const html = [];
-		html.push(`<div class="tvms-pt-grid-head">${__("Time")}</div>`);
-		days.forEach((day) => html.push(`<div class="tvms-pt-grid-head">${day}</div>`));
-
-		slots.forEach((slot) => {
-			html.push(`<div class="tvms-pt-time-cell">${this.time_label(slot)}</div>`);
-			days.forEach((day) => {
-				const cell_sessions = by_cell[`${day}__${slot}`] || [];
-				html.push(`<div class="tvms-pt-day-cell">${cell_sessions.map((s) => this.card(s)).join("")}</div>`);
-			});
+		html.push(`<div class="tvms-pt-grid-head tvms-pt-day-head">${__("Day")}</div>`);
+		time_slots.forEach((slot) => {
+			html.push(`<div class="tvms-pt-grid-head tvms-pt-time-head">${this.time_range_label(slot)}</div>`);
 		});
 
-		const $grid = $(`<div class="tvms-pt-grid"></div>`)
-			.css("grid-template-columns", `90px repeat(${columns - 1}, minmax(140px, 1fr))`)
+		days.forEach((day) => {
+			const day_sessions = by_day[day] || [];
+			const is_closed = day === "Sunday";
+
+			html.push(`<div class="tvms-pt-day-label">${day}</div>`);
+
+			if (is_closed) {
+				time_slots.forEach(() => {
+					html.push(`<div class="tvms-pt-empty-cell tvms-pt-closed">-x-</div>`);
+				});
+				return;
+			}
+
+			const slot_owner = new Array(time_slots.length).fill(null);
+			const slot_starts = new Array(time_slots.length).fill(false);
+
+			day_sessions.forEach((s) => {
+				const start_idx = time_slots.indexOf(String(s.start_time || "").slice(0, 5) + ":00");
+				if (start_idx < 0) return;
+				const start_h = parseInt(String(s.start_time || "00:00").slice(0, 2), 10);
+				const end_h = parseInt(String(s.end_time || "00:00").slice(0, 2), 10);
+				const end_m = parseInt(String(s.end_time || "00:00").slice(3, 5), 10);
+				const span = Math.max(1, (end_h - start_h) + (end_m > 0 ? 1 : 0));
+				for (let i = 0; i < span && (start_idx + i) < time_slots.length; i++) {
+					slot_owner[start_idx + i] = s;
+				}
+				slot_starts[start_idx] = true;
+			});
+
+			for (let i = 0; i < time_slots.length; i++) {
+				const session = slot_owner[i];
+				if (!session) {
+					html.push(`<div class="tvms-pt-empty-cell">---</div>`);
+					continue;
+				}
+				if (!slot_starts[i]) continue;
+				const start_h = parseInt(String(session.start_time || "00:00").slice(0, 2), 10);
+				const end_h = parseInt(String(session.end_time || "00:00").slice(0, 2), 10);
+				const end_m = parseInt(String(session.end_time || "00:00").slice(3, 5), 10);
+				const span = Math.max(1, (end_h - start_h) + (end_m > 0 ? 1 : 0));
+				html.push(`<div class="tvms-pt-session-cell" style="grid-column: span ${span};">${this.card(session)}</div>`);
+			}
+		});
+		
+
+		const $grid = $(`<div class="tvms-pt-grid tvms-pt-grid-excel"></div>`)
+			.css("grid-template-columns", `90px repeat(${time_slots.length}, minmax(110px, 1fr))`)
 			.html(html.join(""));
 
 		$wrap.append($grid);
 		return $section;
 	}
+	// Renders the 3-line printed-format title above each grid
 
+	_build_title_block(group) {
+		const h = this.institutional_header || {};
+		const semester = group.semester || h.semester || "";
+		const ay = group.academic_year || h.academic_year || "";
+		const sem_year = semester
+			? `${semester}${ay ? ` (${ay})` : ""}`
+			: "";
+
+		// Line 1: Institution + Semester + Academic Year
+		const line1 = h.institution && sem_year
+			? `${h.institution}&nbsp;&nbsp;-&nbsp;&nbsp;${sem_year.toUpperCase()}`
+			: h.institution || sem_year.toUpperCase() || "";
+
+		// Line 2: Program name + level + code
+		// Format: "BACHELOR'S DEGREE IN INFORMATION TECHNOLOGY LEVEL-8 BIT"
+		const program_parts = [];
+		if (group.program_name) program_parts.push(group.program_name);
+		if (group.year_number) program_parts.push(`LEVEL-${group.year_number}`);
+		if (group.program_code) program_parts.push(group.program_code);
+		const line2 = program_parts.join(" ").toUpperCase();
+
+		// Line 3: Stream (only if set)
+		const line3 = group.stream ? group.stream.toUpperCase() : "";
+
+		return `
+			<div class="tvms-pt-title-block">
+				${line1 ? `<div class="tvms-pt-title-line1">${frappe.utils.escape_html_all(line1)}</div>` : ""}
+				${line2 ? `<div class="tvms-pt-title-line2">${frappe.utils.escape_html(line2)}</div>` : ""}
+				${line3 ? `<div class="tvms-pt-title-line3">${frappe.utils.escape_html(line3)}</div>` : ""}
+			</div>
+		`;
+	}
+
+ 
+ 
+// ─── REPLACE card() — Excel-style content layout ───────────
+ 
 	card(session) {
 		const status_class = session.venue_status === "IN-USE" ? "in-use"
 			: session.venue_status === "BOOKED" ? "booked" : "";
-
-		// Show publish badge to admins so they can see at a glance which entries
-		// are still drafts vs published as official.
+ 
 		const pub = (session.publish_status || "").toUpperCase();
 		const is_draft = pub === "DRAFT";
 		const badge = this.is_admin && pub
@@ -372,21 +770,59 @@ class TVMSProgramTimetable {
 			}</span>`
 			: "";
 		const draft_cls = this.is_admin && is_draft ? " is-draft" : "";
-
+ 
+		// Course display = code + name (Excel format: "AEU 08208E Project Management")
+		const course_line = session.course && session.course_name
+			? `${frappe.utils.escape_html(session.course)} ${frappe.utils.escape_html(session.course_name)}`
+			: frappe.utils.escape_html(session.course || session.course_name || __("Untitled"));
+ 
+		// Venue display with capacity (Excel format: "LWF 04 - B 15 (Capacity: 240)")
+		const venue_text = session.venue_name || session.venue || __("No venue");
+		const venue_line = session.venue_capacity
+			? `${frappe.utils.escape_html(venue_text)} (Capacity: ${session.venue_capacity})`
+			: frappe.utils.escape_html(venue_text);
+ 
 		return `
 			<div class="tvms-pt-card${draft_cls}" data-name="${frappe.utils.escape_html(session.name)}">
-				<div class="tvms-pt-card-title">
-					${frappe.utils.escape_html(session.course_name || session.course || __("Untitled"))}
+				<div class="tvms-pt-card-course">
+					${course_line}
 					${badge}
 				</div>
-				<div class="tvms-pt-card-meta">
-					<span class="tvms-pt-status-dot ${status_class}"></span>
-					${frappe.utils.escape_html(session.venue_name || session.venue || __("No venue"))}
+				<div class="tvms-pt-card-lecturer">
+					${frappe.utils.escape_html(session.lecturer_name || session.lecturer || "")}
 				</div>
-				<div class="tvms-pt-card-meta">${frappe.utils.escape_html(session.lecturer_name || session.lecturer || "")}</div>
-				${session.students_groups ? `<div class="tvms-pt-card-meta">${frappe.utils.escape_html(session.students_groups)}</div>` : ""}
+				<div class="tvms-pt-card-venue">
+					<span class="tvms-pt-status-dot ${status_class}"></span>
+					${venue_line}
+				</div>
+				${session.students_groups ? `
+					<div class="tvms-pt-card-students">
+						${frappe.utils.escape_html(session.students_groups)}
+					</div>` : ""}
 			</div>
 		`;
+	}
+ 
+ 
+// ─── ADD: new helper functions (near get_slots / get_days) ──
+ 
+	// Generate every hourly slot from 07:00 to 21:00
+	// Returns ["07:00:00", "08:00:00", ..., "20:00:00"]
+	get_hourly_slots() {
+		const slots = [];
+		for (let h = 7; h < 21; h++) {
+			slots.push(`${String(h).padStart(2, "0")}:00:00`);
+		}
+		return slots;
+	}
+ 
+	// Format slot for display: "07:00:00" → "07:00 - 08:00"
+	time_range_label(slot) {
+		const start = String(slot).slice(0, 5);
+		const start_h = parseInt(slot.slice(0, 2), 10);
+		const end_h = start_h + 1;
+		const end = `${String(end_h).padStart(2, "0")}:00`;
+		return `${start} - ${end}`;
 	}
 
 	// ------------------------------------------------------------------
@@ -394,7 +830,25 @@ class TVMSProgramTimetable {
 	// ------------------------------------------------------------------
 
 	get_days() {
-		return this.include_weekends ? PT_DAY_NAMES : PT_DAY_NAMES.slice(0, 5);
+		return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+	}
+		// Generate every hourly slot from 07:00 to 21:00
+	// Returns ["07:00:00", "08:00:00", ..., "20:00:00"]
+	get_hourly_slots() {
+		const slots = [];
+		for (let h = 7; h < 21; h++) {
+			slots.push(`${String(h).padStart(2, "0")}:00:00`);
+		}
+		return slots;
+	}
+ 
+	// Format slot for display: "07:00:00" → "07:00 - 08:00"
+	time_range_label(slot) {
+		const start = String(slot).slice(0, 5);
+		const start_h = parseInt(slot.slice(0, 2), 10);
+		const end_h = start_h + 1;
+		const end = `${String(end_h).padStart(2, "0")}:00`;
+		return `${start} - ${end}`;
 	}
 
 	get_slots(sessions) {

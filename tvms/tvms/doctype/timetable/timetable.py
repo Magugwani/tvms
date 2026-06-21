@@ -829,10 +829,10 @@ def get_week_timetable(
 	venue_map = {
 		r["name"]: r
 		for r in frappe.db.get_all(
-			"Venue", fields=["name", "venue_name", "current_status", "location"]
+			"Venue", fields=["name", "venue_name", "current_status", "location", "capacity"]
 		)
 	}
-
+ 
 	for s in sessions:
 		s["course_name"]    = course_map.get(s["course"]) or s["course"]
 		s["lecturer_name"]  = user_map.get(s["lecturer"]) if s.get("lecturer") else None
@@ -840,7 +840,8 @@ def get_week_timetable(
 		s["venue_name"]     = v.get("venue_name") if v else s.get("venue")
 		s["venue_status"]   = v.get("current_status") if v else None
 		s["venue_location"] = v.get("location") if v else None
-
+		s["venue_capacity"] = v.get("capacity") if v else None
+ 
 	return sessions
 
 
@@ -1001,6 +1002,19 @@ def get_program_timetable_groups(
 	sessions = get_week_timetable(week_start, include_weekends=include_weekends)
 
 	groups = {}
+	# Build a program lookup so we don't query for each group
+	program_codes = list({s.get("program") for s in sessions if s.get("program")})
+	program_map = {}
+	if program_codes:
+		program_map = {
+			r["name"]: r
+			for r in frappe.db.get_all(
+				"Program",
+				filters={"name": ["in", program_codes]},
+				fields=["name", "program_name", "program_code"],
+			)
+		}
+
 	for s in sessions:
 		s_program = s.get("program") or ""
 		s_year    = s.get("year_level") or ""
@@ -1012,13 +1026,41 @@ def get_program_timetable_groups(
 
 		key = f"{s_program}||{s_year}"
 		if key not in groups:
-			label = f"{s_program} - {s_year}" if (s_program and s_year) else (s_program or s_year or "Unassigned")
+			# Build the printed-format title pieces
+			p_info = program_map.get(s_program, {})
+			program_name = p_info.get("program_name") or s_program
+			program_code = p_info.get("program_code") or s_program
+
+			# year_level is like "Third Year (3)" — extract the number
+			year_num = ""
+			if s_year:
+				import re
+				m = re.search(r"\((\d+)\)", s_year)
+				year_num = m.group(1) if m else ""
+
+			# Find a representative stream (most sessions use the same one)
+			streams = [str(x.get("students_groups") or "").strip()
+			           for x in sessions
+			           if x.get("program") == s_program and x.get("year_level") == s_year]
+			streams = [s for s in streams if s]
+			stream = streams[0] if streams else ""
+
+			# Semester + academic_year — should all match within a group
+			semester      = s.get("semester") or ""
+			academic_year = s.get("academic_year") or ""
+
 			groups[key] = {
-				"key":        key,
-				"label":      label,
-				"program":    s_program,
-				"year_level": s_year,
-				"sessions":   [],
+				"key":           key,
+				"label":         f"{program_name} - {s_year}" if s_year else program_name,
+				"program":       s_program,
+				"program_name":  program_name.upper(),
+				"program_code":  program_code,
+				"year_level":    s_year,
+				"year_number":   year_num,
+				"stream":        stream,
+				"semester":      semester,
+				"academic_year": academic_year,
+				"sessions":      [],
 			}
 		groups[key]["sessions"].append(s)
 
@@ -1040,6 +1082,43 @@ def get_program_timetable_groups(
 	)
 
 	return {"week_start": week_start, "groups": sorted_groups}
+
+@frappe.whitelist(methods=["GET"])
+def get_institutional_header():
+	"""Return institution name + current semester/year for the page header.
+
+	The institution name comes from TVMS Settings.company. Semester and
+	year come from the most-recently-active Timetable entries (so the
+	header automatically shows whichever semester admins are currently
+	scheduling for).
+	"""
+	frappe.has_permission("Timetable", "read", throw=True)
+
+	# Institution name
+	institution = frappe.db.get_single_value("TVMS Settings", "company") or "University"
+
+	# Current semester + year — pick the one with most recent timetable activity
+	current = frappe.db.sql("""
+		SELECT semester, academic_year, COUNT(*) AS n
+		FROM   `tabTimetable`
+		WHERE  publish_status = 'PUBLISHED'
+		AND    date >= CURDATE() - INTERVAL 90 DAY
+		GROUP BY semester, academic_year
+		ORDER BY n DESC
+		LIMIT 1
+	""", as_dict=True)
+
+	semester = ""
+	academic_year = ""
+	if current:
+		semester      = current[0].get("semester") or ""
+		academic_year = current[0].get("academic_year") or ""
+
+	return {
+		"institution":    institution.upper(),
+		"semester":       semester,
+		"academic_year":  academic_year,
+	}
 
 
 @frappe.whitelist(methods=["GET"])
@@ -1300,3 +1379,63 @@ def search_timetable_changes(
 			"changed_by": changed_by, "action": action, "program": program,
 		},
 	}
+
+
+@frappe.whitelist(methods=["GET"])
+def get_my_program_segment():
+	"""Resolve the logged-in user's program + year_level.
+
+	Used by the page to highlight the user's own segment when they
+	land on /app/tvms-program-timetable.
+
+	Resolution order:
+	  1. Look at the user's most recent Timetable entries — if they're
+	     a lecturer with sessions, infer from one of those entries
+	  2. Look at User.bio for "program=XYZ year=N" hints
+	  3. Return empty (user sees the full university view)
+
+	Returns:
+	    {"program": "BIT", "year_level": "Third Year (3)"} or empty dict
+	"""
+	user = frappe.session.user
+	if user == "Guest" or user == "Administrator":
+		return {}
+
+	# Method 1: lecturer? Find any session they teach this semester
+	tt = frappe.db.get_all(
+		"Timetable",
+		filters={"lecturer": user},
+		fields=["program", "year_level"],
+		order_by="creation desc",
+		limit=1,
+	)
+	if tt:
+		return {
+			"program":    tt[0].get("program") or "",
+			"year_level": tt[0].get("year_level") or "",
+		}
+
+	# Method 2: parse from User.bio
+	# Format expected: "program=BIT year=3" or "program: BIT, year: 3"
+	bio = frappe.db.get_value("User", user, "bio") or ""
+	if "program" in bio.lower():
+		import re
+		prog_match = re.search(r"program\s*[=:]\s*([A-Z0-9-]+)", bio, re.IGNORECASE)
+		year_match = re.search(r"year\s*[=:]\s*(\d)", bio, re.IGNORECASE)
+		if prog_match:
+			# Reconstruct year_level format used in Timetable
+			year_num = year_match.group(1) if year_match else ""
+			year_map = {
+				"1": "First Year (1)",
+				"2": "Second Year (2)",
+				"3": "Third Year (3)",
+				"4": "Fourth Year (4)",
+				"5": "Fifth Year (5)",
+			}
+			return {
+				"program":    prog_match.group(1).upper(),
+				"year_level": year_map.get(year_num, ""),
+			}
+
+	# Method 3: nothing known — user sees full view
+	return {}

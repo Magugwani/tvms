@@ -4,6 +4,9 @@
  "autoname": "field:course_code",
  "creation": "2026-04-22 01:23:19.250859",
  "doctype": "DocType",
+ "title_field": "course_name",
+"show_title_field_in_link": 1,
+"search_fields": "course_name,course_code,program",
  "engine": "InnoDB",
  "field_order": [
   "section_break_0wmy",
