@@ -47,7 +47,7 @@ class Program(Document):
             )
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_all_programs(department: str = None, status: str = None):
     """List programs for dropdowns on Timetable, Course, and the public page."""
     frappe.has_permission("Program", "read", throw=True)
@@ -69,7 +69,7 @@ def get_all_programs(department: str = None, status: str = None):
     )
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_program_years(program: str):
     """Return the list of year labels valid for a program (used by Timetable year_level select).
 

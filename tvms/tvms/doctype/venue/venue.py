@@ -379,7 +379,7 @@ def _get_venue_booking_windows(venue_name, at_time=None, limit=5):
 # FR-11: New — venue full detail API (includes all new fields)
 # ---------------------------------------------------------------
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_venue_detail(venue: str):
 	"""Return full venue details including all FR-11 fields and live status.
 
@@ -419,7 +419,7 @@ def get_venue_detail(venue: str):
 # FR-22 — Nearby venues for the public page
 # ============================================================
  
-@frappe.whitelist(methods=["GET"], allow_guest=True)
+@frappe.whitelist(methods=["GET", "POST"], allow_guest=True)
 def get_nearby_venues(venue: str, radius_m: int = 200, limit: int = 5):
     """Return up to `limit` venues within `radius_m` of the given venue.
  
@@ -507,7 +507,7 @@ def get_nearby_venues(venue: str, radius_m: int = 200, limit: int = 5):
 # FR-22 — Walking distance estimate (used by public page hero)
 # ============================================================
  
-@frappe.whitelist(methods=["GET"], allow_guest=True)
+@frappe.whitelist(methods=["GET", "POST"], allow_guest=True)
 def estimate_walking_distance(from_lat: float, from_lng: float, to_venue: str):
     """Estimate walking distance and time from a point to a venue.
  
@@ -549,7 +549,7 @@ def estimate_walking_distance(from_lat: float, from_lng: float, to_venue: str):
 # FR-24 — QR codes for door signs
 # ============================================================
  
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_venue_qr(venue: str, size: int = 256):
     """Return a base64-encoded PNG QR code pointing to /venue/<code>.
  
@@ -611,7 +611,7 @@ def get_venue_qr(venue: str, size: int = 256):
 # FR-19: New — venues with coordinates only (for map display)
 # ---------------------------------------------------------------
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_venues_for_map(search: str = None, status: str = None):
 	"""Return all venues that have GPS coordinates set.
 
@@ -673,7 +673,7 @@ def _floor_label(n):
 	return f"{n}{suffix} floor"
 
 # ───  Public navigation endpoint for guest (no login) ──────
-@frappe.whitelist(allow_guest=True, methods=["GET"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
 def get_public_venue_navigation(venue: str):
 	"""FR-24: Guest-readable subset of venue info for the public
 	/venue/<code> page.
@@ -759,7 +759,7 @@ def get_venue_directions_link(venue: str, travel_mode: str = "walking") -> str:
 	)
  
  
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_venue_directions(venue: str, travel_mode: str = "walking"):
 	"""Whitelisted wrapper around get_venue_directions_link().
  
@@ -773,7 +773,7 @@ def get_venue_directions(venue: str, travel_mode: str = "walking"):
  
 
 # ─── QR generator (admin only) ────────
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def generate_venue_qr(venue: str, size: int = 320, return_format: str = "data_url"):
 	"""FR-24: Generate a QR code PNG for the public venue page.
  
@@ -1089,7 +1089,7 @@ def log_venue_status_change(
 		)
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_venue_status_history(venue: str, limit: int = 50):
 	"""Return status change history for a venue, newest first (FR-14).
 

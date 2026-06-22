@@ -7,7 +7,7 @@ from frappe.model.document import Document
 
 class TVMSSettings(Document):
     pass
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_mapbox_token():
     """Return Mapbox public token for map pages.
     Safe to expose — public tokens are rate-limited by domain in Mapbox dashboard."""

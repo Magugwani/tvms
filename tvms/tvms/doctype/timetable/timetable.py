@@ -554,7 +554,7 @@ def bulk_delete_timetable_entries(
 # FR-2 — Fetch one entry for the edit dialog
 # ============================================================
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_timetable_entry(name: str):
 	"""Return one Timetable entry, pre-formatted for the edit dialog.
 
@@ -595,7 +595,7 @@ def get_timetable_entry(name: str):
 # Conflict preview — used by the Add Class dialog
 # ============================================================
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def preview_conflicts(
 	date: str,
 	start_time: str,
@@ -745,7 +745,7 @@ def unpublish_timetable(
  
 	return {"unpublished": len(published)}
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_publish_status_summary():
 	"""Quick stat: how many DRAFT vs PUBLISHED entries currently exist.
 	Drives the publish button label on the admin page."""
@@ -845,7 +845,7 @@ def get_week_timetable(
 	return sessions
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_published_week_timetable(
 	week_start: str,
 	program: str = None,
@@ -1083,7 +1083,7 @@ def get_program_timetable_groups(
 
 	return {"week_start": week_start, "groups": sorted_groups}
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_institutional_header():
 	"""Return institution name + current semester/year for the page header.
 
@@ -1121,7 +1121,7 @@ def get_institutional_header():
 	}
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_program_year_options():
 	"""Return distinct (program, year_level) combinations for filters
 	and for pre-filling the Add Class dialog with a specific segment.
@@ -1252,7 +1252,7 @@ def get_current_user_context():
 		"is_lecturer": primary_role == "lecturer",
 	}
 #  Two whitelisted read APIs for the UI
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_timetable_history(timetable_entry: str, limit: int = 50):
 	"""Return the change log for one Timetable entry, newest first.
  
@@ -1307,7 +1307,7 @@ def get_timetable_history(timetable_entry: str, limit: int = 50):
 	}
  
  
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def search_timetable_changes(
 	from_date: str = None,
 	to_date: str = None,
@@ -1381,7 +1381,7 @@ def search_timetable_changes(
 	}
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_my_program_segment():
 	"""Resolve the logged-in user's program + year_level.
 

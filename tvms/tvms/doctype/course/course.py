@@ -33,7 +33,7 @@ class Course(Document):
             frappe.throw(_("Expected students cannot be negative"))
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_courses_by_program(program: str = None, year: str = None, status: str = "Active"):
     """List courses for dropdowns on Timetable forms — filterable by program and year.
 

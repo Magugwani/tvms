@@ -41,7 +41,7 @@ class Departments(Document):
             })
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_all_departments(status: str = None):
     """List departments for dropdowns and the timetable page filters."""
     frappe.has_permission("Departments", "read", throw=True)

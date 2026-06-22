@@ -249,7 +249,7 @@ def refresh_token():
     }
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def me():
     """Return the current user's profile.
 

@@ -1061,53 +1061,145 @@ class TVMSEnrollmentPage {
 
 	async _render_manage_tab() {
 		const $tab = this.wrapper.find('.tve-tab-content[data-content="manage"]');
+ 
 		$tab.html(`
 			<div class="tve-card">
-				<div class="tve-filters-row">
-					<input type="text" class="form-control input-sm" id="mgmt-search"
-						placeholder="${__('Search name or email')}">
-					<select class="form-control input-sm" id="mgmt-role">
-						<option value="">${__("All roles")}</option>
-						<option value="Student">${__("Student")}</option>
-						<option value="Lecturer">${__("Lecturer")}</option>
-						<option value="Class Representative (CR)">${__("CR")}</option>
-						<option value="Department Admin">${__("Department Admin")}</option>
-					</select>
-					<select class="form-control input-sm" id="mgmt-enabled">
-						<option value="">${__("All statuses")}</option>
-						<option value="1">${__("Enabled only")}</option>
-						<option value="0">${__("Disabled only")}</option>
-					</select>
-					<button class="btn btn-default btn-sm" id="mgmt-refresh">
-						<i class="fa fa-refresh"></i>
+				<div class="tve-section-title">
+					${__("User Management")}
+				</div>
+ 
+				<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
+					${__("Manage users through Frappe's built-in user list — search, filter, edit, assign permissions, and bulk actions are all available there.")}
+				</p>
+ 
+				<div class="tve-action-row">
+					<a class="btn btn-primary" href="/app/user" target="_blank">
+						<i class="fa fa-external-link"></i> ${__("Open User List")}
+					</a>
+					<a class="btn btn-default" href="/app/tvms-enrollment-batch" target="_blank">
+						<i class="fa fa-history"></i> ${__("View Import History")}
+					</a>
+				</div>
+			</div>
+ 
+			<div class="tve-card">
+				<div class="tve-section-title">
+					${__("Quick Role Promotion")}
+				</div>
+ 
+				<p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
+					${__("Promote a Student to Class Representative (CR) or a Lecturer to Department Admin. Type the user's email and choose the action.")}
+				</p>
+ 
+				<div class="tve-form-row">
+					<div class="tve-form-field">
+						<label>${__("User Email")} <span class="req">*</span></label>
+						<input type="email" id="role-email" placeholder="user@nit.ac.tz">
+					</div>
+					<div class="tve-form-field">
+						<label>${__("Action")} <span class="req">*</span></label>
+						<select id="role-action">
+							<option value="">${__("Choose action...")}</option>
+							<option value="promote_to_cr">${__("Promote Student to CR")}</option>
+							<option value="demote_from_cr">${__("Remove CR role")}</option>
+							<option value="promote_to_dept_admin">${__("Promote Lecturer to Department Admin")}</option>
+							<option value="demote_from_dept_admin">${__("Remove Department Admin role")}</option>
+							<option value="disable_user">${__("Disable Account")}</option>
+							<option value="enable_user">${__("Enable Account")}</option>
+							<option value="reset_password">${__("Reset Password (email new)")}</option>
+						</select>
+					</div>
+				</div>
+ 
+				<div class="tve-action-row">
+					<button class="btn btn-primary" id="role-apply">
+						${__("Apply")}
 					</button>
 				</div>
-
-				<div id="mgmt-results"></div>
-			</div>
-
-			<div class="tve-side-panel" id="user-panel">
-				<div class="tve-sp-header">
-					<div style="font-weight: 500;">${__("User Details")}</div>
-					<button class="tve-sp-close">&times;</button>
-				</div>
-				<div class="tve-sp-body" id="user-panel-body"></div>
+ 
+				<div id="role-result" style="margin-top: 14px;"></div>
 			</div>
 		`);
-
-		// Wire filters
-		$tab.find("#mgmt-search").on("input", frappe.utils.debounce(() => this._load_users(), 400));
-		$tab.find("#mgmt-role, #mgmt-enabled").on("change", () => this._load_users());
-		$tab.find("#mgmt-refresh").on("click", () => this._load_users());
-
-		// Side panel close
-		this.wrapper.find(".tve-sp-close").on("click", () =>
-			this.wrapper.find(".tve-side-panel").removeClass("open")
-		);
-
-		await this._load_users();
+ 
+		// Wire the role promotion form
+		$tab.find("#role-apply").on("click", () => this._apply_role_action());
 	}
-
+	async _apply_role_action() {
+		const email = this.wrapper.find("#role-email").val().trim();
+		const action = this.wrapper.find("#role-action").val();
+		const $result = this.wrapper.find("#role-result");
+ 
+		if (!email || !action) {
+			$result.html(`
+				<div class="tve-result failed">
+					${__("Please provide both an email and an action")}
+				</div>
+			`);
+			return;
+		}
+ 
+		// Confirm destructive actions
+		const destructive = ["disable_user", "reset_password"];
+		if (destructive.includes(action)) {
+			const messages = {
+				"disable_user":  __("Disable {0}? They lose access immediately.", [email]),
+				"reset_password": __("Reset password and email new credentials to {0}?", [email]),
+			};
+			const ok = await new Promise(r =>
+				frappe.confirm(messages[action], () => r(true), () => r(false))
+			);
+			if (!ok) return;
+		}
+ 
+		// Map UI actions to API endpoints
+		const endpoint_map = {
+			"promote_to_cr":         "promote_to_cr",
+			"demote_from_cr":        "demote_from_cr",
+			"promote_to_dept_admin": "promote_to_dept_admin",
+			"demote_from_dept_admin":"demote_from_dept_admin",
+			"disable_user":          "disable_user",
+			"enable_user":           "enable_user",
+			"reset_password":        "reset_user_password",
+		};
+ 
+		const endpoint = endpoint_map[action];
+		const args = { email };
+		if (action === "reset_password") args.send_email = 1;
+ 
+		this.wrapper.find("#role-apply").prop("disabled", true).text(__("Applying..."));
+ 
+		try {
+			const result = await frappe.xcall(
+				`tvms.tvms.api.enrollment.${endpoint}`, args
+			);
+			$result.html(`
+				<div class="tve-result success">
+					<div class="tve-result-summary">
+						${__("Done")} — ${frappe.utils.escape_html(result.action || "OK")}
+					</div>
+					<div style="font-size: 12px; margin-top: 4px;">
+						${frappe.utils.escape_html(email)}
+					</div>
+				</div>
+			`);
+ 
+			// Clear form for next action
+			this.wrapper.find("#role-email").val("");
+			this.wrapper.find("#role-action").val("");
+ 
+		} catch (e) {
+			const err_msg = (e && (e.message || e.responseText)) ||
+				__("Action failed. Verify the user email exists and try again.");
+			$result.html(`
+				<div class="tve-result failed">
+					<div class="tve-result-summary">${__("Action failed")}</div>
+					<div>${frappe.utils.escape_html(err_msg)}</div>
+				</div>
+			`);
+		} finally {
+			this.wrapper.find("#role-apply").prop("disabled", false).text(__("Apply"));
+		}
+	}
 	async _load_users() {
 		const args = {
 			search:  this.wrapper.find("#mgmt-search").val() || null,

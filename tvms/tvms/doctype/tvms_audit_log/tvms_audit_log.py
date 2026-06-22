@@ -134,7 +134,7 @@ def _ensure_audit_read_access():
         frappe.throw(_("Not authorized to view audit log"), frappe.PermissionError)
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_subject_audit(subject_type: str, subject_name: str, limit: int = 100):
     """Return all audit events for one specific subject, newest first.
 
@@ -198,7 +198,7 @@ def get_subject_audit(subject_type: str, subject_name: str, limit: int = 100):
     }
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def search_audit_log(
     from_date: str = None,
     to_date: str = None,
@@ -265,7 +265,7 @@ def search_audit_log(
     }
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_notification_chain(audit_name: str):
     """Walk the linked_audit chain for one event.
 

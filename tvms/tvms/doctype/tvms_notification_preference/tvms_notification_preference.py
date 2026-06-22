@@ -217,7 +217,7 @@ def _in_quiet_hours(quiet_start, quiet_end) -> bool:
 # Whitelisted APIs — used by the Flutter app
 # ============================================================
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_my_preferences():
     """Return the current user's preferences, creating defaults if needed.
 
@@ -283,7 +283,7 @@ def update_my_preferences(**kwargs):
     }
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_preference_schema():
     """Return the schema (labels, descriptions, defaults) of all preference
     fields. Used by the Flutter app to render the settings UI without

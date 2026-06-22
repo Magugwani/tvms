@@ -43,7 +43,7 @@ def _create_tvms_notification(
 # Public APIs consumed by Desk pages and Frappe form scripts
 # ==================================================================
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_user_notifications(limit: int = 30):
 	"""Return the current user's notifications, most recent first."""
 	return frappe.db.get_list(
@@ -59,7 +59,7 @@ def get_user_notifications(limit: int = 30):
 	)
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_unread_count():
 	"""Return the count of unread notifications for the current user."""
 	return frappe.db.count(

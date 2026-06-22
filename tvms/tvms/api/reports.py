@@ -33,7 +33,7 @@ from frappe.utils.pdf import get_pdf
 # Dashboard stats — unchanged
 # ============================================================
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_dashboard_stats():
 	"""Return top-level live stats for the TVMS dashboard."""
 	today = nowdate()
@@ -89,7 +89,7 @@ def get_dashboard_stats():
 # FR-47: Filter options for dropdowns
 # ============================================================
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_filter_options():
 	"""Return values to populate the reports-page filter dropdowns.
 
@@ -147,7 +147,7 @@ def get_filter_options():
 # Venue utilization — now with department + lecturer filters
 # ============================================================
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_venue_utilization(
 	date_from: str,
 	date_to: str,
@@ -303,7 +303,7 @@ def get_venue_utilization(
 # Peak hours — unchanged
 # ============================================================
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_peak_hours(date_from: str = None, date_to: str = None):
 	"""FR-44: Session counts by start hour of day for charting peak usage."""
 	today = nowdate()
@@ -342,7 +342,7 @@ def get_peak_hours(date_from: str = None, date_to: str = None):
 # Session summary — now with department + program filters
 # ============================================================
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_session_summary(
 	date_from: str = None,
 	date_to: str = None,
@@ -583,7 +583,7 @@ def _pdf_response(title: str, subtitle: str, headers: list, rows: list, filename
 	frappe.local.response.type = "pdf"
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def export_venue_utilization(
 	date_from: str,
 	date_to: str,
@@ -645,7 +645,7 @@ def export_venue_utilization(
 	)
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def export_session_summary(
 	date_from: str = None,
 	date_to: str = None,
@@ -705,7 +705,7 @@ def export_session_summary(
 	)
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def export_peak_hours(
 	date_from: str = None,
 	date_to: str = None,

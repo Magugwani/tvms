@@ -744,7 +744,7 @@ class Emergencysession(Document):
 
 # --- Module-level whitelisted APIs ---
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_venue_availability(venue: str, date: str):
 	"""Get all non-cancelled sessions for a venue on a given date"""
 	if not venue or not date:
@@ -919,7 +919,7 @@ def complete_emergency_session(name: str):
 	return frappe.get_doc("Emergency session", name).complete_session()
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_user_emergency_sessions(status: str = None, limit: int = 50):
 	"""Return emergency sessions visible to the current user.
 
@@ -965,7 +965,7 @@ def get_user_emergency_sessions(status: str = None, limit: int = 50):
 	return sessions
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_upcoming_sessions(limit: int = 10):
 	"""Get upcoming PENDING and CONFIRMED emergency sessions"""
 	return frappe.db.get_list(
@@ -980,7 +980,7 @@ def get_upcoming_sessions(limit: int = 10):
 	)
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def check_venue_conflicts(
 	venue: str,
 	start_time: str,
@@ -1004,7 +1004,7 @@ def check_venue_conflicts(
 	)
 
 
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def get_week_emergency_sessions(
 	week_start: str,
 	venue: str = None,

@@ -162,7 +162,7 @@ def unregister_device_token(token: str):
 	return {"deactivated": bool(name)}
  
  
-@frappe.whitelist(methods=["GET"])
+@frappe.whitelist(methods=["GET", "POST"])
 def list_my_devices():
 	"""Mobile app uses this to show 'my registered devices' in settings."""
 	user = frappe.session.user
