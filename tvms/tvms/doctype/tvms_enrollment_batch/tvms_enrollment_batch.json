@@ -1,0 +1,189 @@
+{
+ "actions": [],
+ "autoname": "format:ENROLL-{####}",
+ "creation": "2026-06-22 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "header_section",
+  "batch_type",
+  "uploaded_file",
+  "sync_mode",
+  "send_welcome_emails",
+  "column_break_1",
+  "imported_at",
+  "imported_by",
+  "status",
+  "results_section",
+  "total_rows",
+  "rows_created",
+  "rows_updated",
+  "rows_skipped",
+  "rows_failed",
+  "users_disabled",
+  "details_section",
+  "summary",
+  "error_log"
+ ],
+ "fields": [
+  {
+   "fieldname": "header_section",
+   "fieldtype": "Section Break",
+   "label": "Import Details"
+  },
+  {
+   "fieldname": "batch_type",
+   "fieldtype": "Select",
+   "options": "STUDENT\nLECTURER\nINDIVIDUAL",
+   "label": "Batch Type",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "uploaded_file",
+   "fieldtype": "Data",
+   "label": "Source File",
+   "read_only": 1,
+   "description": "Filename of the uploaded CSV"
+  },
+  {
+   "fieldname": "sync_mode",
+   "fieldtype": "Check",
+   "label": "Sync Mode Enabled",
+   "read_only": 1,
+   "default": "0",
+   "description": "If checked, users not in the CSV were disabled"
+  },
+  {
+   "fieldname": "send_welcome_emails",
+   "fieldtype": "Check",
+   "label": "Welcome Emails Sent",
+   "read_only": 1,
+   "default": "1"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "imported_at",
+   "fieldtype": "Datetime",
+   "label": "Imported At",
+   "read_only": 1,
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "imported_by",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Imported By",
+   "read_only": 1,
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "options": "IN PROGRESS\nCOMPLETED\nFAILED\nPARTIAL",
+   "label": "Status",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "default": "IN PROGRESS"
+  },
+  {
+   "fieldname": "results_section",
+   "fieldtype": "Section Break",
+   "label": "Results"
+  },
+  {
+   "fieldname": "total_rows",
+   "fieldtype": "Int",
+   "label": "Total Rows in CSV",
+   "read_only": 1,
+   "default": 0
+  },
+  {
+   "fieldname": "rows_created",
+   "fieldtype": "Int",
+   "label": "Users Created",
+   "read_only": 1,
+   "in_list_view": 1,
+   "default": 0
+  },
+  {
+   "fieldname": "rows_updated",
+   "fieldtype": "Int",
+   "label": "Users Updated",
+   "read_only": 1,
+   "in_list_view": 1,
+   "default": 0
+  },
+  {
+   "fieldname": "rows_skipped",
+   "fieldtype": "Int",
+   "label": "Rows Skipped",
+   "read_only": 1,
+   "default": 0,
+   "description": "Rows with no changes needed"
+  },
+  {
+   "fieldname": "rows_failed",
+   "fieldtype": "Int",
+   "label": "Rows Failed",
+   "read_only": 1,
+   "in_list_view": 1,
+   "default": 0
+  },
+  {
+   "fieldname": "users_disabled",
+   "fieldtype": "Int",
+   "label": "Users Disabled",
+   "read_only": 1,
+   "default": 0,
+   "description": "Only set when Sync Mode was used"
+  },
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Details",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Text",
+   "label": "Summary",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error_log",
+   "fieldtype": "Code",
+   "options": "Text",
+   "label": "Error Log",
+   "read_only": 1,
+   "description": "Row-by-row errors that occurred during import"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "is_submittable": 0,
+ "links": [],
+ "modified": "2026-06-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "TVMS Enrollment Batch",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {"email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager", "share": 1},
+  {"email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "Administrator", "share": 1}
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "imported_at",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0,
+ "track_views": 0
+}
