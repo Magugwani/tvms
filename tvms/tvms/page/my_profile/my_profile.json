@@ -1,0 +1,23 @@
+{
+ "content": null,
+ "creation": "2026-06-22 02:58:49.013387",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-06-22 02:58:49.013387",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "my-profile",
+ "owner": "Administrator",
+ "page_name": "my-profile",
+   "roles": [
+    {
+      "role": "All"
+    }
+  ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "View Profile"
+}

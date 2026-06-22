@@ -1,17 +1,42 @@
-# tvms_mobile
+# TVMS Mobile
 
-TVMS - Timetable and Venue Management System
+TVMS (Timetable and Venue Management System) Mobile Application built with Flutter.
+
+TVMS is a system designed to manage timetable schedules, venue utilization, and venue availability, including support for emergency scheduling in institutions such as universities.
+
+## About the Project
+
+This project is the mobile client application for the TVMS platform.
+
+The application provides mobile access to TVMS features such as:
+
+- Timetable viewing
+- Venue management
+- Venue availability checking
+- Emergency schedule support
+- User authentication
+- Communication with the TVMS backend API
+
+## Technology Stack
+
+- Flutter
+- Dart
+- REST API Integration
+- Frappe
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+This project is built using Flutter.
 
-A few resources to get you started if this is your first Flutter project:
+### Prerequisites
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Make sure you have:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Flutter SDK installed
+- Android Studio or VS Code
+- Android emulator or physical device
+
+Check Flutter installation:
+
+```bash
+flutter doctor

@@ -1,0 +1,175 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:program_code",
+ "creation": "2026-06-12 04:33:13.520456",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_npoz",
+  "program_code",
+  "program_name",
+  "column_break_vqod",
+  "department",
+  "faculty",
+  "details_section",
+  "level_of_study",
+  "duration",
+  "column_break_details",
+  "status"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_npoz",
+   "fieldtype": "Section Break",
+   "label": "Program Details"
+  },
+  {
+   "description": "Unique program code, used as the document ID (e.g. BSc-IT, BBA, BCAE)",
+   "fieldname": "program_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Program Code",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "program_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Program Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_vqod",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Department",
+   "options": "Departments",
+   "reqd": 1
+  },
+  {
+   "description": "Faculty this program belongs to (auto-fillable from Department)",
+   "fieldname": "faculty",
+   "fieldtype": "Data",
+   "label": "Faculty"
+  },
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Academic Details"
+  },
+  {
+   "default": "Bachelor's Degree",
+   "fieldname": "level_of_study",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Level of Study",
+   "options": "Certificate\nDiploma\nHigher Diploma\nBachelor's Degree\nPostgraduate Diploma\nMaster's Degree\nPhD",
+   "reqd": 1
+  },
+  {
+   "default": "3",
+   "description": "Total length of the program in years",
+   "fieldname": "duration",
+   "fieldtype": "Int",
+   "label": "Duration (Years)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Active",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Active\nInactive"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-18 21:02:59.584682",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "Program",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Administrator",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Department Admin",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Lecturer",
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Class Representative (CR)",
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Student",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "program_name",
+ "sort_order": "ASC",
+ "states": []
+}

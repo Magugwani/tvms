@@ -1,0 +1,160 @@
+{
+ "actions": [],
+ "autoname": "format:TT-CHG-{####}",
+ "creation": "2026-06-16 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "header_section",
+  "timetable_entry",
+  "action",
+  "column_break_1",
+  "timestamp",
+  "changed_by",
+  "summary_section",
+  "summary",
+  "reason",
+  "changes_section",
+  "changes",
+  "snapshot_section",
+  "snapshot_before",
+  "snapshot_after"
+ ],
+ "fields": [
+  {
+   "fieldname": "header_section",
+   "fieldtype": "Section Break",
+   "label": "Change Header"
+  },
+  {
+   "fieldname": "timetable_entry",
+   "fieldtype": "Link",
+   "options": "Timetable",
+   "label": "Timetable Entry",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "description": "The timetable row that was changed"
+  },
+  {
+   "fieldname": "action",
+   "fieldtype": "Select",
+   "options": "CREATED\nUPDATED\nPUBLISHED\nUNPUBLISHED\nDELETED",
+   "label": "Action",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "timestamp",
+   "fieldtype": "Datetime",
+   "label": "When",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "changed_by",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Changed By",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "summary_section",
+   "fieldtype": "Section Break",
+   "label": "Summary"
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Small Text",
+   "label": "Summary",
+   "in_list_view": 1,
+   "read_only": 1,
+   "description": "Human-readable single-line description of the change"
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "description": "Optional — admins can supply why the change was made"
+  },
+  {
+   "fieldname": "changes_section",
+   "fieldtype": "Section Break",
+   "label": "Field-Level Changes",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "changes",
+   "fieldtype": "Code",
+   "options": "JSON",
+   "label": "Changed Fields",
+   "read_only": 1,
+   "description": "JSON: [{fieldname, old, new}, ...] — only populated for UPDATED action"
+  },
+  {
+   "fieldname": "snapshot_section",
+   "fieldtype": "Section Break",
+   "label": "Full Snapshot",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.snapshot_after"
+  },
+  {
+   "fieldname": "snapshot_before",
+   "fieldtype": "Code",
+   "options": "JSON",
+   "label": "Before",
+   "read_only": 1,
+   "description": "Empty for CREATED action"
+  },
+  {
+   "fieldname": "snapshot_after",
+   "fieldtype": "Code",
+   "options": "JSON",
+   "label": "After",
+   "read_only": 1,
+   "description": "Empty for DELETED action"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "is_submittable": 0,
+ "links": [],
+ "modified": "2026-06-16 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "Timetable Change Log",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "email": 1, "export": 1, "print": 1,
+   "read": 1, "report": 1,
+   "role": "System Manager", "share": 1
+  },
+  {
+   "email": 1, "export": 1, "print": 1,
+   "read": 1, "report": 1,
+   "role": "Administrator", "share": 1
+  },
+  {
+   "email": 1, "export": 1, "print": 1,
+   "read": 1, "report": 1,
+   "role": "Department Admin", "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "timestamp",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0,
+ "track_views": 0
+}

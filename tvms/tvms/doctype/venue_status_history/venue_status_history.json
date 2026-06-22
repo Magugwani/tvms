@@ -1,0 +1,111 @@
+{
+ "actions": [],
+ "autoname": "autoincrement",
+ "creation": "2026-06-08 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "timestamp",
+  "from_status",
+  "to_status",
+  "column_break_1",
+  "trigger",
+  "triggered_by",
+  "reference_section",
+  "reference_type",
+  "reference_name",
+  "note"
+ ],
+ "fields": [
+  {
+   "fieldname": "timestamp",
+   "fieldtype": "Datetime",
+   "label": "Timestamp",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "When the status change occurred"
+  },
+  {
+   "fieldname": "from_status",
+   "fieldtype": "Select",
+   "label": "From Status",
+   "options": "\nFREE\nBOOKED\nIN-USE\nEXPIRED",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Status before the transition"
+  },
+  {
+   "fieldname": "to_status",
+   "fieldtype": "Select",
+   "label": "To Status",
+   "options": "FREE\nBOOKED\nIN-USE\nEXPIRED",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Status after the transition"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "trigger",
+   "fieldtype": "Select",
+   "label": "Trigger",
+   "options": "\nEmergency Session Confirmed\nEmergency Session Cancelled\nEmergency Session Completed\nEmergency Session Expired\nEmergency Session Created\nTimetable Session Active\nTimetable Session Ended\nScheduler Sync\nManual",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "What caused this status change"
+  },
+  {
+   "fieldname": "triggered_by",
+   "fieldtype": "Link",
+   "label": "Triggered By",
+   "options": "User",
+   "read_only": 1,
+   "description": "User who caused the change (if applicable)"
+  },
+  {
+   "fieldname": "reference_section",
+   "fieldtype": "Section Break",
+   "label": "Source Reference"
+  },
+  {
+   "fieldname": "reference_type",
+   "fieldtype": "Select",
+   "label": "Reference Type",
+   "options": "\nEmergency session\nTimetable\nScheduler",
+   "read_only": 1,
+   "description": "DocType that caused this transition"
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Data",
+   "label": "Reference Name",
+   "read_only": 1,
+   "description": "Document name that caused this transition (e.g. EMS-0001)"
+  },
+  {
+   "fieldname": "note",
+   "fieldtype": "Small Text",
+   "label": "Note",
+   "read_only": 1,
+   "description": "Additional context about this transition"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "Venue Status History",
+ "naming_rule": "Autoincrement",
+ "owner": "maduhumagugwani@gmail.com",
+ "permissions": [],
+ "sort_field": "timestamp",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

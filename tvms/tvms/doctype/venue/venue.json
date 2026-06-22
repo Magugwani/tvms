@@ -1,0 +1,269 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:venue_code",
+ "creation": "2026-04-22 01:23:19.250859",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "basic_info_section",
+  "venue_name",
+  "venue_code",
+  "venue_type",
+  "column_break_basic",
+  "building_name",
+  "floor_number",
+  "location",
+  "capacity",
+  "physical_details_section",
+  "resources",
+  "accessibility_features",
+  "column_break_physical",
+  "current_status",
+  "amended_from",
+  "coordinates_section",
+  "latitude",
+  "longitude",
+  "column_break_coords",
+  "map_link",
+  "navigation_notes",
+  "status_history_section",
+  "status_history"
+ ],
+ "fields": [
+  {
+   "fieldname": "basic_info_section",
+   "fieldtype": "Section Break",
+   "label": "Basic Information"
+  },
+  {
+   "fieldname": "venue_name",
+   "fieldtype": "Data",
+   "label": "Venue Name",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "venue_code",
+   "fieldtype": "Data",
+   "label": "Venue Code",
+   "unique": 1,
+   "reqd": 1,
+   "description": "Unique short code for this venue (e.g. LH-01, LAB-A3). Used as the document ID."
+  },
+  {
+   "fieldname": "venue_type",
+   "fieldtype": "Select",
+   "label": "Venue Type",
+   "options": "\nLecture Hall\nClassroom\nLaboratory\nSeminar Room\nAuditorium\nOffice\nComputer Lab\nLibrary\nOther",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_basic",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "building_name",
+   "fieldtype": "Data",
+   "label": "Building Name",
+   "description": "Name of the building this venue is in (e.g. Block A, Science Complex)",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "floor_number",
+   "fieldtype": "Int",
+   "label": "Floor Number",
+   "description": "Floor level: 0 = Ground floor, 1 = First floor, -1 = Basement",
+   "default": "0"
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Location Description",
+   "description": "Human-readable location detail (e.g. Block A, 2nd Floor, East Wing)"
+  },
+  {
+   "fieldname": "capacity",
+   "fieldtype": "Int",
+   "label": "Capacity",
+   "reqd": 1,
+   "description": "Maximum number of people this venue can hold"
+  },
+  {
+   "fieldname": "physical_details_section",
+   "fieldtype": "Section Break",
+   "label": "Physical Details & Status"
+  },
+  {
+   "fieldname": "resources",
+   "fieldtype": "Small Text",
+   "label": "Available Resources",
+   "description": "Comma-separated list of equipment available (e.g. Projector, Whiteboard, Lab computers, AC)"
+  },
+  {
+   "fieldname": "accessibility_features",
+   "fieldtype": "Small Text",
+   "label": "Accessibility Features",
+   "description": "Features for users with disabilities (e.g. Wheelchair ramp, Hearing loop, Elevator access, Braille signage)"
+  },
+  {
+   "fieldname": "column_break_physical",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "FREE",
+   "fieldname": "current_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Current Status",
+   "options": "FREE\nBOOKED\nIN-USE\nEXPIRED",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Venue",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "coordinates_section",
+   "fieldtype": "Section Break",
+   "label": "GPS Coordinates & Navigation",
+   "description": "Required for map display and navigation assistance"
+  },
+  {
+   "fieldname": "latitude",
+   "fieldtype": "Float",
+   "label": "Latitude",
+   "precision": "6",
+   "description": "GPS latitude in decimal degrees (e.g. -6.792354). Get this from Google Maps."
+  },
+  {
+   "fieldname": "longitude",
+   "fieldtype": "Float",
+   "label": "Longitude",
+   "precision": "6",
+   "description": "GPS longitude in decimal degrees (e.g. 39.208328). Get this from Google Maps."
+  },
+  {
+   "fieldname": "column_break_coords",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "map_link",
+   "fieldtype": "Data",
+   "label": "Map Link",
+   "description": "Optional direct Google Maps or campus map URL for this venue"
+  },
+  {
+   "fieldname": "navigation_notes",
+   "fieldtype": "Small Text",
+   "label": "Navigation Notes",
+   "description": "Step-by-step instructions to reach this venue (e.g. Enter from main gate, turn left at reception, second door on right)"
+  },
+      {
+      "fieldname": "status_history_section",
+      "fieldtype": "Section Break",
+      "label": "Status History",
+      "description": "Automatic log of every status transition for this venue (FR-14)"
+    },
+    {
+      "fieldname": "status_history",
+      "fieldtype": "Table",
+      "label": "Status History",
+      "options": "Venue Status History",
+      "read_only": 1,
+      "cannot_delete_rows": 1,
+      "in_list_view": 0,
+      "description": "Each row is one status transition — written automatically, never manually"
+    }
+ ],
+ "grid_page_length": 50,
+ "hide_toolbar": 1,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-06-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "Venue",
+ "naming_rule": "By fieldname",
+ "owner": "maduhumagugwani@gmail.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Administrator",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Department Admin",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Lecturer",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Class Representative (CR)",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Student",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,136 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:department_code",
+ "creation": "2026-06-12 04:51:02.621529",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "basic_section",
+  "department_code",
+  "department_name",
+  "column_break_basic",
+  "head_of_department",
+  "email",
+  "details_section",
+  "number_of_staff",
+  "faculty",
+  "column_break_details",
+  "status",
+  "programs_section",
+  "programs_offered"
+ ],
+ "fields": [
+  {
+   "fieldname": "basic_section",
+   "fieldtype": "Section Break",
+   "label": "Basic Information"
+  },
+  {
+   "fieldname": "department_code",
+   "fieldtype": "Data",
+   "label": "Department Code",
+   "unique": 1,
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Unique short code, used as the document ID (e.g. CSE, MGT, FIN)"
+  },
+  {
+   "fieldname": "department_name",
+   "fieldtype": "Data",
+   "label": "Department Name",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_basic",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "head_of_department",
+   "fieldtype": "Link",
+   "label": "Head of Department",
+   "options": "User",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "fieldname": "number_of_staff",
+   "fieldtype": "Int",
+   "label": "Number of Staff",
+   "default": "0"
+  },
+  {
+   "fieldname": "faculty",
+   "fieldtype": "Data",
+   "label": "Faculty",
+   "description": "Parent faculty this department belongs to"
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Active",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Active\nInactive",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "programs_section",
+   "fieldtype": "Section Break",
+   "label": "Programs Offered",
+   "description": "Programs run by this department — child rows are read-only; create Program records and link the department field there."
+  },
+  {
+   "fieldname": "programs_offered",
+   "fieldtype": "Table",
+   "label": "Programs",
+   "options": "Department Program",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-16 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "Departments",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1, "print": 1,
+   "read": 1, "report": 1, "role": "System Manager", "share": 1, "write": 1
+  },
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1, "print": 1,
+   "read": 1, "report": 1, "role": "Administrator", "share": 1, "write": 1
+  },
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1, "print": 1,
+   "read": 1, "report": 1, "role": "Department Admin", "share": 1, "write": 1
+  },
+  {"email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "Lecturer", "share": 1},
+  {"email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "Class Representative (CR)", "share": 1},
+  {"email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "Student", "share": 1}
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "department_name",
+ "sort_order": "ASC",
+ "states": []
+}

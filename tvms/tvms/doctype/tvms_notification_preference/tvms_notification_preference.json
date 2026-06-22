@@ -1,0 +1,241 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:user",
+ "creation": "2026-06-19 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user_section",
+  "user",
+  "column_break_user",
+  "summary",
+  "channels_section",
+  "channel_in_app",
+  "channel_email",
+  "channel_push",
+  "column_break_channels",
+  "channel_sms",
+  "channel_realtime",
+  "events_section",
+  "events_help",
+  "session_created",
+  "session_confirmed",
+  "session_cancelled",
+  "session_postponed",
+  "column_break_events",
+  "session_reminder",
+  "session_completed",
+  "timetable_updates",
+  "venue_changes",
+  "quiet_hours_section",
+  "respect_quiet_hours",
+  "quiet_start",
+  "column_break_quiet",
+  "quiet_end",
+  "critical_override"
+ ],
+ "fields": [
+  {
+   "fieldname": "user_section",
+   "fieldtype": "Section Break",
+   "label": "User"
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "User",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "column_break_user",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Data",
+   "label": "Summary",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Auto-generated overview of which channels are on"
+  },
+  {
+   "fieldname": "channels_section",
+   "fieldtype": "Section Break",
+   "label": "Delivery Channels",
+   "description": "Choose how you want to receive notifications. Channels marked off will be skipped silently."
+  },
+  {
+   "default": "1",
+   "fieldname": "channel_in_app",
+   "fieldtype": "Check",
+   "label": "In-app inbox",
+   "description": "Notifications appear in the Tvms Notifications inbox. Cannot be disabled — always on."
+  },
+  {
+   "default": "1",
+   "fieldname": "channel_email",
+   "fieldtype": "Check",
+   "label": "Email"
+  },
+  {
+   "default": "1",
+   "fieldname": "channel_push",
+   "fieldtype": "Check",
+   "label": "Mobile push (FCM)",
+   "description": "Requires the mobile app to be installed and notification permission granted."
+  },
+  {
+   "fieldname": "column_break_channels",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "channel_sms",
+   "fieldtype": "Check",
+   "label": "SMS",
+   "description": "Only used for critical notifications. Requires a phone number on the user record."
+  },
+  {
+   "default": "1",
+   "fieldname": "channel_realtime",
+   "fieldtype": "Check",
+   "label": "Browser live updates",
+   "description": "WebSocket push when you have the Desk open in a browser."
+  },
+  {
+   "fieldname": "events_section",
+   "fieldtype": "Section Break",
+   "label": "Event Types",
+   "collapsible": 1,
+   "description": "Granular control — turn off types you don't care about. Critical notifications always go through regardless."
+  },
+  {
+   "fieldname": "events_help",
+   "fieldtype": "HTML",
+   "options": "<div style='font-size:12px;color:#888780;margin-bottom:8px;'>Critical notifications (is_critical=1) bypass these settings and are always delivered.</div>"
+  },
+  {
+   "default": "1",
+   "fieldname": "session_created",
+   "fieldtype": "Check",
+   "label": "Session created"
+  },
+  {
+   "default": "1",
+   "fieldname": "session_confirmed",
+   "fieldtype": "Check",
+   "label": "Session confirmed"
+  },
+  {
+   "default": "1",
+   "fieldname": "session_cancelled",
+   "fieldtype": "Check",
+   "label": "Session cancelled"
+  },
+  {
+   "default": "1",
+   "fieldname": "session_postponed",
+   "fieldtype": "Check",
+   "label": "Session postponed"
+  },
+  {
+   "fieldname": "column_break_events",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "session_reminder",
+   "fieldtype": "Check",
+   "label": "2-hour reminders"
+  },
+  {
+   "default": "0",
+   "fieldname": "session_completed",
+   "fieldtype": "Check",
+   "label": "Session completed"
+  },
+  {
+   "default": "1",
+   "fieldname": "timetable_updates",
+   "fieldtype": "Check",
+   "label": "Timetable changes"
+  },
+  {
+   "default": "1",
+   "fieldname": "venue_changes",
+   "fieldtype": "Check",
+   "label": "Venue changes"
+  },
+  {
+   "fieldname": "quiet_hours_section",
+   "fieldtype": "Section Break",
+   "label": "Quiet Hours",
+   "collapsible": 1,
+   "description": "Mute non-critical pushes during these hours"
+  },
+  {
+   "default": "0",
+   "fieldname": "respect_quiet_hours",
+   "fieldtype": "Check",
+   "label": "Enable quiet hours"
+  },
+  {
+   "fieldname": "quiet_start",
+   "fieldtype": "Time",
+   "label": "Quiet from",
+   "default": "22:00:00",
+   "depends_on": "respect_quiet_hours"
+  },
+  {
+   "fieldname": "column_break_quiet",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "quiet_end",
+   "fieldtype": "Time",
+   "label": "Quiet until",
+   "default": "07:00:00",
+   "depends_on": "respect_quiet_hours"
+  },
+  {
+   "default": "1",
+   "fieldname": "critical_override",
+   "fieldtype": "Check",
+   "label": "Critical notifications always wake me",
+   "depends_on": "respect_quiet_hours",
+   "description": "Critical (is_critical=1) notifications still deliver during quiet hours"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-06-19 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "tvms",
+ "name": "TVMS Notification Preference",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1, "print": 1,
+   "read": 1, "report": 1, "role": "System Manager", "share": 1, "write": 1
+  },
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1, "print": 1,
+   "read": 1, "report": 1, "role": "Administrator", "share": 1, "write": 1
+  },
+  {"email": 1, "print": 1, "read": 1, "role": "Lecturer", "write": 1},
+  {"email": 1, "print": 1, "read": 1, "role": "Class Representative (CR)", "write": 1},
+  {"email": 1, "print": 1, "read": 1, "role": "Student", "write": 1},
+  {"email": 1, "print": 1, "read": 1, "role": "Department Admin", "write": 1}
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "user",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 1
+}
